@@ -6,10 +6,12 @@
 (() => {
   const root = document.currentScript.previousElementSibling;
   const track = root.querySelector('[data-reviewloom-carousel-track]');
-  fetch('/apps/reviewloom/reviews?limit=12').then((response) => { if (!response.ok) throw new Error('bad response'); return response.json(); }).then((data) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  fetch('/apps/reviewloom/reviews?limit=12', { signal: controller.signal }).then((response) => { if (!response.ok) throw new Error('bad response'); return response.json(); }).then((data) => {
     if (!data.reviews.length) { track.innerHTML = '<p>No reviews yet.</p>'; return; }
     track.innerHTML = data.reviews.map((review) => `<article><span class="reviewloom-carousel__stars">${'★'.repeat(review.rating)}</span><p>“${review.body}”</p><strong>${review.reviewer}</strong><small>${review.productName}</small></article>`).join(''); const cards = [...track.children]; let current = 0; const show = () => cards.forEach((card, index) => { card.hidden = index !== current; }); root.querySelector('[data-reviewloom-prev]').onclick = () => { current = (current - 1 + cards.length) % cards.length; show(); }; root.querySelector('[data-reviewloom-next]').onclick = () => { current = (current + 1) % cards.length; show(); }; show();
-  }).catch(() => { track.innerHTML = '<p>Reviews are temporarily unavailable.</p>'; });
+  }).catch(() => { track.innerHTML = '<p>Reviews are temporarily unavailable.</p>'; }).finally(() => clearTimeout(timeout));
 })();
 </script>
 

@@ -22,18 +22,24 @@
 <script>
 (() => {
   const root = document.currentScript.previousElementSibling;
-  const anchor = document.querySelector({{ block.settings.anchor_selector | json }}) || document.querySelector('product-info, .product, main');
-  if ({{ block.settings.position | json }} === 'after_selector' && anchor && anchor !== root.parentElement) {
-    anchor.insertAdjacentElement('afterend', root);
+  if ({{ block.settings.position | json }} === 'after_selector') {
+    let anchor = null;
+    try { anchor = document.querySelector({{ block.settings.anchor_selector | json }}); } catch (error) { anchor = null; }
+    anchor = anchor || document.querySelector('product-info, .product, main');
+    if (anchor && anchor !== root.parentElement) {
+      anchor.insertAdjacentElement('afterend', root);
+    }
   }
   const productId = root.dataset.productId;
   const list = root.querySelector('[data-reviewloom-list]');
   const summary = root.querySelector('.reviewloom-reviews__summary');
   const stars = (rating) => `<span class="reviewloom-reviews__stars">${'★'.repeat(rating)}<span>${'★'.repeat(5 - rating)}</span></span>`;
-  fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`).then((response) => { if (!response.ok) throw new Error('bad response'); return response.json(); }).then((data) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`, { signal: controller.signal }).then((response) => { if (!response.ok) throw new Error('bad response'); return response.json(); }).then((data) => {
     summary.innerHTML = `${stars(Math.round(data.average || 0))} ${data.average} out of 5 · ${data.count} reviews`;
     list.innerHTML = data.reviews.length ? data.reviews.map((review) => `<article><div>${stars(review.rating)} <strong>${review.reviewer}</strong></div><p>${review.body}</p></article>`).join('') : '<p>No reviews yet. Be the first to share your experience.</p>';
-  }).catch(() => { summary.textContent = 'Reviews are temporarily unavailable.'; });
+  }).catch(() => { summary.textContent = 'Reviews are temporarily unavailable.'; }).finally(() => clearTimeout(timeout));
   const form = root.querySelector('[data-reviewloom-form]');
   if (!form) return;
   root.querySelector('[data-reviewloom-open]').addEventListener('click', () => { form.hidden = false; form.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
@@ -41,7 +47,16 @@
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const status = form.querySelector('[data-reviewloom-status]');
-    fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`, { method: 'POST', body: new FormData(form) }).then((response) => response.json()).then((result) => { status.textContent = result.error || 'Thanks. Your review is waiting for approval.'; if (!result.error) form.reset(); });
+    const submitButton = form.querySelector('button[type="submit"]');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    submitButton.disabled = true;
+    status.textContent = 'Submitting…';
+    fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`, { method: 'POST', body: new FormData(form), signal: controller.signal })
+      .then((response) => response.json())
+      .then((result) => { status.textContent = result.error || 'Thanks. Your review is waiting for approval.'; if (!result.error) form.reset(); })
+      .catch(() => { status.textContent = 'Something went wrong submitting your review. Please try again.'; })
+      .finally(() => { clearTimeout(timeout); submitButton.disabled = false; });
   });
 })();
 </script>
