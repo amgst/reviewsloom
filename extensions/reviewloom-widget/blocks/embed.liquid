@@ -30,10 +30,10 @@
   const list = root.querySelector('[data-reviewloom-list]');
   const summary = root.querySelector('.reviewloom-reviews__summary');
   const stars = (rating) => `<span class="reviewloom-reviews__stars">${'★'.repeat(rating)}<span>${'★'.repeat(5 - rating)}</span></span>`;
-  fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`).then((response) => response.json()).then((data) => {
+  fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`).then((response) => { if (!response.ok) throw new Error('bad response'); return response.json(); }).then((data) => {
     summary.innerHTML = `${stars(Math.round(data.average || 0))} ${data.average} out of 5 · ${data.count} reviews`;
     list.innerHTML = data.reviews.length ? data.reviews.map((review) => `<article><div>${stars(review.rating)} <strong>${review.reviewer}</strong></div><p>${review.body}</p></article>`).join('') : '<p>No reviews yet. Be the first to share your experience.</p>';
-  });
+  }).catch(() => { summary.textContent = 'Reviews are temporarily unavailable.'; });
   const form = root.querySelector('[data-reviewloom-form]');
   if (!form) return;
   root.querySelector('[data-reviewloom-open]').addEventListener('click', () => { form.hidden = false; form.scrollIntoView({ behavior: 'smooth', block: 'center' }); });

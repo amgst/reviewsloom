@@ -1,7 +1,7 @@
 {% if product %}
 <div class="reviewloom-rating-badge" data-product-id="{{ product.id }}"><span class="reviewloom-rating-badge__stars">★★★★★</span><a href="#reviewloom-form">Loading reviews...</a></div>
 <script>
-(() => { const badge = document.currentScript.previousElementSibling; fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(badge.dataset.productId)}`).then((response) => response.json()).then((data) => { badge.querySelector('a').textContent = `${data.average} out of 5 · ${data.count} reviews`; }); })();
+(() => { const badge = document.currentScript.previousElementSibling; fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(badge.dataset.productId)}`).then((response) => { if (!response.ok) throw new Error('bad response'); return response.json(); }).then((data) => { badge.querySelector('a').textContent = data.count ? `${data.average} out of 5 · ${data.count} reviews` : 'Be the first to review'; }).catch(() => { badge.querySelector('a').textContent = 'Reviews unavailable'; }); })();
 </script>
 {% endif %}
 
