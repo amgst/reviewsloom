@@ -1,7 +1,3 @@
 name = "Reviewloom widget"
 type = "theme"
 uid = "reviewloom-widget"
-
-[[extensions.targeting]]
-target = "section"
-input = "{\"settings\":{\"heading\":{\"type\":\"text\",\"label\":\"Heading\",\"default\":\"What customers are saying\"}}}"
