@@ -1,0 +1,80 @@
+{% if request.page_type == 'product' and product %}
+<section class="reviewloom-reviews reviewloom-embed" data-product-id="{{ product.id }}">
+  <div class="reviewloom-reviews__header">
+    <div><h2>{{ block.settings.heading }}</h2><p class="reviewloom-reviews__summary">Loading reviews...</p></div>
+    {% if block.settings.show_form %}<button class="reviewloom-reviews__button" type="button" data-reviewloom-open>Write a review</button>{% endif %}
+  </div>
+  <div class="reviewloom-reviews__list" data-reviewloom-list></div>
+  {% if block.settings.show_form %}
+    <form class="reviewloom-reviews__form" id="reviewloom-embed-form" data-reviewloom-form hidden>
+      <h3>Share your experience</h3>
+      <input name="product_name" type="hidden" value="{{ product.title | escape }}">
+      <label>Rating <select name="rating" required><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></label>
+      <label>Your name <input name="reviewer" type="text" required></label>
+      <label>Email <input name="email" type="email"></label>
+      <label>Your review <textarea name="body" rows="4" required></textarea></label>
+      <label>Photo URL (optional) <input name="image_url" type="url"></label>
+      <div><button class="reviewloom-reviews__button" type="submit">Submit for review</button><button class="reviewloom-reviews__cancel" type="button" data-reviewloom-close>Cancel</button></div>
+      <p class="reviewloom-reviews__form-status" data-reviewloom-status></p>
+    </form>
+  {% endif %}
+</section>
+<script>
+(() => {
+  const root = document.currentScript.previousElementSibling;
+  const anchor = document.querySelector({{ block.settings.anchor_selector | json }}) || document.querySelector('product-info, .product, main');
+  if ({{ block.settings.position | json }} === 'after_selector' && anchor && anchor !== root.parentElement) {
+    anchor.insertAdjacentElement('afterend', root);
+  }
+  const productId = root.dataset.productId;
+  const list = root.querySelector('[data-reviewloom-list]');
+  const summary = root.querySelector('.reviewloom-reviews__summary');
+  const stars = (rating) => `<span class="reviewloom-reviews__stars">${'★'.repeat(rating)}<span>${'★'.repeat(5 - rating)}</span></span>`;
+  fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`).then((response) => response.json()).then((data) => {
+    summary.innerHTML = `${stars(Math.round(data.average || 0))} ${data.average} out of 5 · ${data.count} reviews`;
+    list.innerHTML = data.reviews.length ? data.reviews.map((review) => `<article><div>${stars(review.rating)} <strong>${review.reviewer}</strong></div><p>${review.body}</p></article>`).join('') : '<p>No reviews yet. Be the first to share your experience.</p>';
+  });
+  const form = root.querySelector('[data-reviewloom-form]');
+  if (!form) return;
+  root.querySelector('[data-reviewloom-open]').addEventListener('click', () => { form.hidden = false; form.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+  root.querySelector('[data-reviewloom-close]').addEventListener('click', () => { form.hidden = true; });
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const status = form.querySelector('[data-reviewloom-status]');
+    fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`, { method: 'POST', body: new FormData(form) }).then((response) => response.json()).then((result) => { status.textContent = result.error || 'Thanks. Your review is waiting for approval.'; if (!result.error) form.reset(); });
+  });
+})();
+</script>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Reviewloom auto-embed",
+  "target": "body",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "What customers are saying" },
+    { "type": "checkbox", "id": "show_form", "label": "Allow new reviews", "default": true },
+    {
+      "type": "select",
+      "id": "position",
+      "label": "Placement",
+      "options": [
+        { "value": "here", "label": "Right where the theme prints app embeds (usually end of body)" },
+        { "value": "after_selector", "label": "Move directly after a CSS selector on the page" }
+      ],
+      "default": "here"
+    },
+    { "type": "text", "id": "anchor_selector", "label": "CSS selector to insert after (used when Placement is \"after selector\")", "default": "product-info" }
+  ]
+}
+{% endschema %}
+
+<style>
+.reviewloom-reviews { --reviewloom-coral: #d95d39; --reviewloom-ink: #17221d; color: var(--reviewloom-ink); max-width: 760px; margin: 40px auto; font-family: Georgia, serif; }
+.reviewloom-reviews__header { display: flex; justify-content: space-between; align-items: end; gap: 20px; border-bottom: 1px solid #ddd4ca; padding-bottom: 14px; }
+.reviewloom-reviews h2, .reviewloom-reviews h3 { margin: 0; }.reviewloom-reviews__summary, .reviewloom-reviews__form, .reviewloom-reviews__form input, .reviewloom-reviews__form textarea, .reviewloom-reviews__form select { font-family: sans-serif; }
+.reviewloom-reviews__stars { color: var(--reviewloom-coral); letter-spacing: 2px; }.reviewloom-reviews__stars span { color: #d7cec4; }
+.reviewloom-reviews__list article { border-bottom: 1px solid #eee8e1; padding: 18px 0; }.reviewloom-reviews__list p { margin: 9px 0 0; font: 15px/1.5 sans-serif; }
+.reviewloom-reviews__button { border: 0; background: var(--reviewloom-coral); color: white; padding: 11px 16px; cursor: pointer; }.reviewloom-reviews__cancel { border: 0; background: transparent; padding: 11px 16px; cursor: pointer; }
+.reviewloom-reviews__form { background: #f5f0e8; padding: 20px; margin-top: 24px; }.reviewloom-reviews__form label { display: block; margin-top: 12px; }.reviewloom-reviews__form input, .reviewloom-reviews__form textarea, .reviewloom-reviews__form select { display: block; box-sizing: border-box; margin-top: 5px; padding: 10px; width: 100%; border: 1px solid #d9d0c5; background: white; }
+</style>
