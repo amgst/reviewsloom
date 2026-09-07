@@ -31,6 +31,16 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@prisma/client"
         update-types: ["version-update:semver-major"]
+      # @remix-run/eslint-config (Remix 2.x) still peer-requires react@^18, so a
+      # React 19 bump breaks npm install with ERESOLVE. Skip until Remix supports it.
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
 
     groups:
 
