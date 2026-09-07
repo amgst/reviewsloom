@@ -1,9 +1,9 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "81fb4a205e84f0797b409983b3f51061"
+client_id = "e574ed4b18b0eaadc95051b2f4341ab6"
 application_url = "https://reviewsloom.vercel.app"
 embedded = true
-name = "Wbify Reviews"
+name = "Review Loom"
 
 [app_proxy]
 url = "/api/reviews"
@@ -27,10 +27,10 @@ api_version = "2026-10"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = ""
+scopes = "read_products,write_products,read_orders,write_themes"
 
 [auth]
-redirect_urls = [ "https://reviewsloom.vercel.app/api/auth" ]
+redirect_urls = [ "https://reviewsloom.vercel.app/auth/callback" ]
 
 [build]
 include_config_on_deploy = true
