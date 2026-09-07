@@ -59,12 +59,12 @@
       "id": "position",
       "label": "Placement",
       "options": [
-        { "value": "here", "label": "Right where the theme prints app embeds (usually end of body)" },
-        { "value": "after_selector", "label": "Move directly after a CSS selector on the page" }
+        { "value": "here", "label": "End of page (default)" },
+        { "value": "after_selector", "label": "After a CSS selector" }
       ],
       "default": "here"
     },
-    { "type": "text", "id": "anchor_selector", "label": "CSS selector to insert after (used when Placement is \"after selector\")", "default": "product-info" }
+    { "type": "text", "id": "anchor_selector", "label": "CSS selector", "info": "Used when Placement is \"After a CSS selector\"", "default": "product-info" }
   ]
 }
 {% endschema %}
