@@ -23,6 +23,15 @@ updates:
       semver-minor-days: 14
       semver-patch-days: 14
 
+    # Prisma major versions can outpace @shopify/shopify-app-session-storage-prisma's
+    # peer dependency support (e.g. Prisma 7 vs the package's ^6.x requirement),
+    # producing unmergeable ERESOLVE PRs. Skip major bumps until that package catches up.
+    ignore:
+      - dependency-name: "prisma"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@prisma/client"
+        update-types: ["version-update:semver-major"]
+
     groups:
 
       # Group together PRs of dependant packages
