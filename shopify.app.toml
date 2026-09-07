@@ -33,5 +33,4 @@ scopes = "read_products,write_products,read_orders,write_themes"
 redirect_urls = [ "https://reviewsloom.vercel.app/auth/callback" ]
 
 [build]
-include_config_on_deploy = true
 automatically_update_urls_on_dev = true
