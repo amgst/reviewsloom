@@ -1,0 +1,19 @@
+<section class="reviewloom-carousel" data-reviewloom-carousel>
+  <div class="reviewloom-carousel__heading"><h2>{{ block.settings.heading }}</h2><div><button type="button" data-reviewloom-prev aria-label="Previous review">←</button><button type="button" data-reviewloom-next aria-label="Next review">→</button></div></div>
+  <div class="reviewloom-carousel__track" data-reviewloom-carousel-track><p>Loading reviews...</p></div>
+</section>
+<script>
+(() => {
+  const root = document.currentScript.previousElementSibling;
+  const track = root.querySelector('[data-reviewloom-carousel-track]');
+  fetch('/apps/reviewloom/reviews?limit=12').then((response) => response.json()).then((data) => { track.innerHTML = data.reviews.map((review) => `<article><span class="reviewloom-carousel__stars">${'★'.repeat(review.rating)}</span><p>“${review.body}”</p><strong>${review.reviewer}</strong><small>${review.productName}</small></article>`).join(''); const cards = [...track.children]; let current = 0; const show = () => cards.forEach((card, index) => { card.hidden = index !== current; }); root.querySelector('[data-reviewloom-prev]').onclick = () => { current = (current - 1 + cards.length) % cards.length; show(); }; root.querySelector('[data-reviewloom-next]').onclick = () => { current = (current + 1) % cards.length; show(); }; show(); });
+})();
+</script>
+
+{% schema %}
+{ "name": "Review carousel", "target": "section", "settings": [{ "type": "text", "id": "heading", "label": "Heading", "default": "Loved by customers" }] }
+{% endschema %}
+
+<style>
+.reviewloom-carousel { --reviewloom-coral: #d95d39; --reviewloom-ink: #17221d; max-width: 900px; margin: 40px auto; color: var(--reviewloom-ink); }.reviewloom-carousel__heading { display: flex; justify-content: space-between; align-items: center; }.reviewloom-carousel__heading h2 { margin: 0; font-family: Georgia, serif; }.reviewloom-carousel__heading button { border: 1px solid #d9d0c5; background: white; padding: 8px 12px; cursor: pointer; }.reviewloom-carousel__track article { background: #f5f0e8; margin-top: 14px; padding: 26px; min-height: 130px; }.reviewloom-carousel__track p { font: 20px/1.4 Georgia, serif; }.reviewloom-carousel__track strong, .reviewloom-carousel__track small { display: block; font: 13px sans-serif; }.reviewloom-carousel__track small { color: #65735b; margin-top: 6px; }.reviewloom-carousel__stars { color: var(--reviewloom-coral); letter-spacing: 2px; }
+</style>

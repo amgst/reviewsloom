@@ -1,0 +1,14 @@
+{% if product %}
+<div class="reviewloom-rating-badge" data-product-id="{{ product.id }}"><span class="reviewloom-rating-badge__stars">★★★★★</span><a href="#reviewloom-form">Loading reviews...</a></div>
+<script>
+(() => { const badge = document.currentScript.previousElementSibling; fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(badge.dataset.productId)}`).then((response) => response.json()).then((data) => { badge.querySelector('a').textContent = `${data.average} out of 5 · ${data.count} reviews`; }); })();
+</script>
+{% endif %}
+
+{% schema %}
+{ "name": "Rating beside product title", "target": "section", "settings": [] }
+{% endschema %}
+
+<style>
+.reviewloom-rating-badge { display: inline-flex; align-items: center; gap: 9px; margin: 8px 0; font: 13px sans-serif; }.reviewloom-rating-badge__stars { color: #d95d39; letter-spacing: 2px; }.reviewloom-rating-badge a { color: #17221d; }
+</style>

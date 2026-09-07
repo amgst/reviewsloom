@@ -1,0 +1,14 @@
+:root { --reviewloom-ink: #17221d; --reviewloom-coral: #d95d39; --reviewloom-sand: #f5f0e8; --reviewloom-moss: #65735b; }
+.reviewloom-shell { max-width: 1180px; margin: 0 auto; padding: 28px 0 56px; }
+.reviewloom-intro { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
+.reviewloom-intro h1 { color: var(--reviewloom-ink); letter-spacing: -0.02em; margin-top: 4px; }
+.reviewloom-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 22px; }
+.reviewloom-metrics .Polaris-Card { background: var(--reviewloom-sand); border: 0; }
+.reviewloom-section-heading { display: flex; align-items: center; justify-content: space-between; padding: 22px; gap: 20px; }
+.reviewloom-review-copy { flex: 1; min-width: 0; }
+.reviewloom-review-copy .Polaris-InlineStack { margin-bottom: 6px; }
+.review-stars, .reviewloom-preview-stars { color: var(--reviewloom-coral); letter-spacing: 2px; white-space: nowrap; }
+.empty-stars { color: #d7cec4; }
+.reviewloom-preview { background: var(--reviewloom-sand); padding: 18px; border-radius: 6px; }
+.reviewloom-settings-preview { background: var(--reviewloom-sand); padding: 22px; border-radius: 6px; }
+@media (max-width: 760px) { .reviewloom-shell { padding: 18px 0 40px; } .reviewloom-intro { align-items: start; flex-direction: column; } .reviewloom-metrics { grid-template-columns: 1fr; } .reviewloom-section-heading { align-items: start; flex-direction: column; } }

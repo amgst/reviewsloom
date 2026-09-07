@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
+}
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  shop        String
+  productId   String
+  productName String
+  reviewer    String
+  email       String?
+  rating      Int
+  body        String
+  imageUrl    String?
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ReviewSettings {
+  id             String  @id @default(cuid())
+  shop           String  @unique
+  accentColor    String  @default("#D95D39")
+  starStyle      String  @default("solid")
+  reviewFormOn   Boolean @default(true)
+  requestEmailOn Boolean @default(true)
+}
+
+model ReviewRequest {
+  id          String   @id @default(cuid())
+  shop        String
+  orderId     String
+  email       String
+  productName String
+  sentAt      DateTime @default(now())
+}
