@@ -41,6 +41,10 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/react-dom"
         update-types: ["version-update:semver-major"]
+      # @remix-run/eslint-config (Remix 2.x) peer-requires eslint@^8.0.0, so an
+      # eslint 9/10 bump breaks npm install with ERESOLVE. Skip until Remix supports it.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
 
     groups:
 
