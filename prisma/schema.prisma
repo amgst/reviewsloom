@@ -66,3 +66,18 @@ model ReviewRequest {
   productName String
   sentAt      DateTime @default(now())
 }
+
+model Question {
+  id          String    @id @default(cuid())
+  shop        String
+  productId   String
+  productName String
+  question    String
+  asker       String
+  email       String?
+  answer      String?
+  answeredAt  DateTime?
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
