@@ -61,9 +61,12 @@ model ReviewSettings {
 model ReviewRequest {
   id          String   @id @default(cuid())
   shop        String
-  orderId     String
+  orderId     String?
   email       String
   productName String
+  productUrl  String?
+  emailId     String?
+  error       String?
   sentAt      DateTime @default(now())
 }
 
