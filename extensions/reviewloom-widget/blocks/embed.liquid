@@ -1,5 +1,5 @@
 {% if request.page_type == 'product' and product %}
-<section class="reviewloom-reviews reviewloom-embed" data-product-id="{{ product.id }}">
+<section class="reviewloom-reviews reviewloom-embed" id="reviewloom-reviews" data-product-id="{{ product.id }}">
   <div class="reviewloom-reviews__header">
     <div><h2>{{ block.settings.heading }}</h2><p class="reviewloom-reviews__summary">Loading reviews...</p></div>
     {% if block.settings.show_form %}<button class="reviewloom-reviews__button" type="button" data-reviewloom-open>Write a review</button>{% endif %}
