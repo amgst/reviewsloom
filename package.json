@@ -2,7 +2,7 @@
   "name": "reviewloom",
   "private": true,
   "scripts": {
-    "build": "prisma generate && prisma migrate deploy && remix vite:build",
+    "build": "prisma generate && node scripts/maybe-migrate.mjs && remix vite:build",
     "postinstall": "prisma generate",
     "dev": "shopify app dev",
     "config:link": "shopify app config link",
