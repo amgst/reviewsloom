@@ -6,7 +6,7 @@ embedded = true
 name = "Review Loom"
 
 [app_proxy]
-url = "/api/reviews"
+url = "/api"
 subpath = "reviewloom"
 prefix = "apps"
 
