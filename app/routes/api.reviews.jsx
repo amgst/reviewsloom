@@ -11,6 +11,7 @@ export const loader = async ({ request }) => {
     const average = reviews.length ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length : 0;
     return json({ average: Number(average.toFixed(1)), count: reviews.length, reviews }, { headers: { "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=60" } });
   } catch (error) {
+    console.error("[api.reviews] loader failed", error);
     return json({ average: 0, count: 0, reviews: [], error: "Reviews are temporarily unavailable." }, { status: 500, headers: { "Access-Control-Allow-Origin": "*" } });
   }
 };
@@ -36,6 +37,7 @@ export const action = async ({ request }) => {
     } });
     return json({ review: { id: review.id, status: review.status } }, { status: 201 });
   } catch (error) {
+    console.error("[api.reviews] action failed", error);
     return json({ error: "Something went wrong submitting your review. Please try again." }, { status: 500 });
   }
 };

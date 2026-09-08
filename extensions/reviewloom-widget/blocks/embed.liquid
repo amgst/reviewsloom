@@ -49,13 +49,13 @@
     const status = form.querySelector('[data-reviewloom-status]');
     const submitButton = form.querySelector('button[type="submit"]');
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const timeout = setTimeout(() => controller.abort(), 25000);
     submitButton.disabled = true;
     status.textContent = 'Submitting…';
     fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`, { method: 'POST', body: new FormData(form), signal: controller.signal })
       .then((response) => response.json())
       .then((result) => { status.textContent = result.error || 'Thanks. Your review is waiting for approval.'; if (!result.error) form.reset(); })
-      .catch(() => { status.textContent = 'Something went wrong submitting your review. Please try again.'; })
+      .catch((error) => { status.textContent = error.name === 'AbortError' ? 'This is taking longer than expected. Please try again in a moment.' : 'Something went wrong submitting your review. Please try again.'; })
       .finally(() => { clearTimeout(timeout); submitButton.disabled = false; });
   });
 })();
