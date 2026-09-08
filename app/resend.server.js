@@ -10,11 +10,24 @@ export function getResendClient() {
 
 const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
 
-export async function sendReviewRequestEmail({ id, to, productName, productUrl }) {
+// The "from" address's domain must match a domain verified in Resend, so we
+// can't let each shop pick their own sending address - but we CAN vary the
+// display name per shop, so the email reads as coming from their store
+// rather than generically from Review Loom.
+function buildFromHeader(displayName) {
+  const raw = process.env.RESEND_FROM_EMAIL || "Review Loom <onboarding@resend.dev>";
+  const match = raw.match(/<([^>]+)>/);
+  const address = match ? match[1] : raw.trim();
+  const safeName = (displayName || "Review Loom").replace(/["<>]/g, "").trim();
+  return safeName ? `${safeName} <${address}>` : address;
+}
+
+export async function sendReviewRequestEmail({ id, to, productName, productUrl, senderName, replyTo }) {
   const resend = getResendClient();
   if (!resend) return { error: { message: "RESEND_API_KEY is not configured." } };
 
   const reviewLink = productUrl ? `${productUrl}${productUrl.includes("#") ? "" : "#reviewloom-reviews"}` : null;
+  const from = senderName ? `${senderName} via Review Loom` : "Review Loom";
   const html = `
     <p>Hi,</p>
     <p>Thanks for your recent purchase of <strong>${escapeHtml(productName)}</strong>! We'd love to hear what you thought.</p>
@@ -24,8 +37,9 @@ export async function sendReviewRequestEmail({ id, to, productName, productUrl }
 
   return resend.emails.send(
     {
-      from: process.env.RESEND_FROM_EMAIL || "Review Loom <onboarding@resend.dev>",
+      from: buildFromHeader(from),
       to: [to],
+      replyTo: replyTo || undefined,
       subject: `How was ${productName}?`,
       html,
     },

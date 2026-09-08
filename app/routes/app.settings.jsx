@@ -31,6 +31,8 @@ export const action = async ({ request }) => {
     starStyle: formData.get("starStyle") || "solid",
     reviewFormOn: formData.get("reviewFormOn") === "on",
     requestEmailOn: formData.get("requestEmailOn") === "on",
+    senderName: formData.get("senderName") || null,
+    supportEmail: formData.get("supportEmail") || null,
   } });
   return json({ saved: true });
 };
@@ -42,6 +44,8 @@ export default function Settings() {
   const [starStyle, setStarStyle] = useState(settings.starStyle);
   const [reviewFormOn, setReviewFormOn] = useState(settings.reviewFormOn);
   const [requestEmailOn, setRequestEmailOn] = useState(settings.requestEmailOn);
+  const [senderName, setSenderName] = useState(settings.senderName || "");
+  const [supportEmail, setSupportEmail] = useState(settings.supportEmail || "");
 
   return (
     <Page>
@@ -70,6 +74,13 @@ export default function Settings() {
                   <Text as="h2" variant="headingLg">Review collection</Text>
                   <Checkbox label="Allow customers to submit reviews" name="reviewFormOn" checked={reviewFormOn} onChange={setReviewFormOn} />
                   <Checkbox label="Send a basic email after fulfillment" name="requestEmailOn" checked={requestEmailOn} onChange={setRequestEmailOn} />
+                </BlockStack>
+              </Card>
+              <Card>
+                <BlockStack gap="400">
+                  <Text as="h2" variant="headingLg">Review request emails</Text>
+                  <TextField label="Sender name" name="senderName" value={senderName} onChange={setSenderName} autoComplete="off" placeholder="Your store name" helpText="Shown as the email sender, e.g. “Your Store via Review Loom”. Defaults to your shop name if left blank." />
+                  <TextField label="Support email" name="supportEmail" type="email" value={supportEmail} onChange={setSupportEmail} autoComplete="off" helpText="Customer replies to review request emails go here instead of to us." />
                 </BlockStack>
               </Card>
               <Button submit variant="primary">Save settings</Button>

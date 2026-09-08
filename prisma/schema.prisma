@@ -56,6 +56,8 @@ model ReviewSettings {
   starStyle      String  @default("solid")
   reviewFormOn   Boolean @default(true)
   requestEmailOn Boolean @default(true)
+  senderName     String?
+  supportEmail   String?
 }
 
 model ReviewRequest {

@@ -54,7 +54,8 @@ export const action = async ({ request }) => {
     const productUrl = formData.get("productUrl") || null;
     if (!email || !productName) return json({ error: "A customer email and product name are required." });
     const reviewRequest = await prisma.reviewRequest.create({ data: { shop: session.shop, email, productName, productUrl } });
-    const { data, error } = await sendReviewRequestEmail({ id: reviewRequest.id, to: email, productName, productUrl });
+    const shopSettings = await prisma.reviewSettings.findUnique({ where: { shop: session.shop } });
+    const { data, error } = await sendReviewRequestEmail({ id: reviewRequest.id, to: email, productName, productUrl, senderName: shopSettings?.senderName || session.shop.replace(".myshopify.com", ""), replyTo: shopSettings?.supportEmail || undefined });
     if (error) {
       await prisma.reviewRequest.update({ where: { id: reviewRequest.id }, data: { error: error.message } });
       return json({ error: `Couldn't send the email: ${error.message}` });
