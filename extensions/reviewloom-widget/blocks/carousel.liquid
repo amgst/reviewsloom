@@ -9,8 +9,11 @@
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   fetch('/apps/reviewloom/reviews?limit=12', { signal: controller.signal }).then((response) => { if (!response.ok) throw new Error('bad response'); return response.json(); }).then((data) => {
+    const settings = data.settings || {};
+    const outline = settings.starStyle === 'outline';
+    if (settings.accentColor) root.style.setProperty('--reviewloom-coral', settings.accentColor);
     if (!data.reviews.length) { track.innerHTML = '<p>No reviews yet.</p>'; return; }
-    track.innerHTML = data.reviews.map((review) => `<article><span class="reviewloom-carousel__stars">${'★'.repeat(review.rating)}</span><p>“${review.body}”</p><strong>${review.reviewer}</strong><small>${review.productName}</small></article>`).join(''); const cards = [...track.children]; let current = 0; const show = () => cards.forEach((card, index) => { card.hidden = index !== current; }); root.querySelector('[data-reviewloom-prev]').onclick = () => { current = (current - 1 + cards.length) % cards.length; show(); }; root.querySelector('[data-reviewloom-next]').onclick = () => { current = (current + 1) % cards.length; show(); }; show();
+    track.innerHTML = data.reviews.map((review) => `<article><span class="reviewloom-carousel__stars">${'★'.repeat(review.rating)}<span>${(outline ? '☆' : '★').repeat(5 - review.rating)}</span></span><p>“${review.body}”</p><strong>${review.reviewer}</strong><small>${review.productName}</small></article>`).join(''); const cards = [...track.children]; let current = 0; const show = () => cards.forEach((card, index) => { card.hidden = index !== current; }); root.querySelector('[data-reviewloom-prev]').onclick = () => { current = (current - 1 + cards.length) % cards.length; show(); }; root.querySelector('[data-reviewloom-next]').onclick = () => { current = (current + 1) % cards.length; show(); }; show();
   }).catch(() => { track.innerHTML = '<p>Reviews are temporarily unavailable.</p>'; }).finally(() => clearTimeout(timeout));
 })();
 </script>
@@ -20,5 +23,5 @@
 {% endschema %}
 
 <style>
-.reviewloom-carousel { --reviewloom-coral: #d95d39; --reviewloom-ink: #17221d; max-width: 900px; margin: 40px auto; color: var(--reviewloom-ink); }.reviewloom-carousel__heading { display: flex; justify-content: space-between; align-items: center; }.reviewloom-carousel__heading h2 { margin: 0; font-family: Georgia, serif; }.reviewloom-carousel__heading button { border: 1px solid #d9d0c5; background: white; padding: 8px 12px; cursor: pointer; }.reviewloom-carousel__track article { background: #f5f0e8; margin-top: 14px; padding: 26px; min-height: 130px; }.reviewloom-carousel__track p { font: 20px/1.4 Georgia, serif; }.reviewloom-carousel__track strong, .reviewloom-carousel__track small { display: block; font: 13px sans-serif; }.reviewloom-carousel__track small { color: #65735b; margin-top: 6px; }.reviewloom-carousel__stars { color: var(--reviewloom-coral); letter-spacing: 2px; }
+.reviewloom-carousel { --reviewloom-coral: #d95d39; --reviewloom-ink: #17221d; max-width: 900px; margin: 40px auto; color: var(--reviewloom-ink); }.reviewloom-carousel__heading { display: flex; justify-content: space-between; align-items: center; }.reviewloom-carousel__heading h2 { margin: 0; font-family: Georgia, serif; }.reviewloom-carousel__heading button { border: 1px solid #d9d0c5; background: white; padding: 8px 12px; cursor: pointer; }.reviewloom-carousel__track article { background: #f5f0e8; margin-top: 14px; padding: 26px; min-height: 130px; }.reviewloom-carousel__track p { font: 20px/1.4 Georgia, serif; }.reviewloom-carousel__track strong, .reviewloom-carousel__track small { display: block; font: 13px sans-serif; }.reviewloom-carousel__track small { color: #65735b; margin-top: 6px; }.reviewloom-carousel__stars { color: var(--reviewloom-coral); letter-spacing: 2px; }.reviewloom-carousel__stars span { color: #d7cec4; }
 </style>

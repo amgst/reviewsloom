@@ -33,16 +33,24 @@
   const productId = root.dataset.productId;
   const list = root.querySelector('[data-reviewloom-list]');
   const summary = root.querySelector('.reviewloom-reviews__summary');
-  const stars = (rating) => `<span class="reviewloom-reviews__stars">${'★'.repeat(rating)}<span>${'★'.repeat(5 - rating)}</span></span>`;
+  const openButton = root.querySelector('[data-reviewloom-open]');
+  const form = root.querySelector('[data-reviewloom-form]');
+  const stars = (rating, outline) => `<span class="reviewloom-reviews__stars">${'★'.repeat(rating)}<span>${(outline ? '☆' : '★').repeat(5 - rating)}</span></span>`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`, { signal: controller.signal }).then((response) => { if (!response.ok) throw new Error('bad response'); return response.json(); }).then((data) => {
-    summary.innerHTML = `${stars(Math.round(data.average || 0))} ${data.average} out of 5 · ${data.count} reviews`;
-    list.innerHTML = data.reviews.length ? data.reviews.map((review) => `<article><div>${stars(review.rating)} <strong>${review.reviewer}</strong></div><p>${review.body}</p></article>`).join('') : '<p>No reviews yet. Be the first to share your experience.</p>';
+    const settings = data.settings || {};
+    const outline = settings.starStyle === 'outline';
+    if (settings.accentColor) root.style.setProperty('--reviewloom-coral', settings.accentColor);
+    if (settings.reviewFormOn === false) {
+      if (openButton) openButton.hidden = true;
+      if (form) form.hidden = true;
+    }
+    summary.innerHTML = `${stars(Math.round(data.average || 0), outline)} ${data.average} out of 5 · ${data.count} reviews`;
+    list.innerHTML = data.reviews.length ? data.reviews.map((review) => `<article><div>${stars(review.rating, outline)} <strong>${review.reviewer}</strong></div><p>${review.body}</p></article>`).join('') : '<p>No reviews yet. Be the first to share your experience.</p>';
   }).catch(() => { summary.textContent = 'Reviews are temporarily unavailable.'; }).finally(() => clearTimeout(timeout));
-  const form = root.querySelector('[data-reviewloom-form]');
   if (!form) return;
-  root.querySelector('[data-reviewloom-open]').addEventListener('click', () => { form.hidden = false; form.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+  if (openButton) openButton.addEventListener('click', () => { form.hidden = false; form.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
   root.querySelector('[data-reviewloom-close]').addEventListener('click', () => { form.hidden = true; });
   form.addEventListener('submit', (event) => {
     event.preventDefault();
