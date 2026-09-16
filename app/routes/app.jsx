@@ -23,6 +23,7 @@ export default function App() {
           Reviews
         </Link>
         <Link to="/app/questions">Q&amp;A</Link>
+        <Link to="/app/requests">Send request</Link>
         <Link to="/app/settings">Settings</Link>
       </NavMenu>
       <Outlet />

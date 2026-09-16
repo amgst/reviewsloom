@@ -1,15 +1,38 @@
 {% if product %}
-<section class="reviewloom-reviews" id="reviewloom-reviews" data-product-id="{{ product.id }}">
-  <div class="reviewloom-reviews__header">
-    <div><h2>{{ block.settings.heading }}</h2><p class="reviewloom-reviews__summary">Loading reviews...</p></div>
-    {% if block.settings.show_form %}<button class="reviewloom-reviews__button" type="button" data-reviewloom-open>Write a review</button>{% endif %}
-  </div>
-  <div class="reviewloom-reviews__list" data-reviewloom-list></div>
+<section class="reviewloom-reviews reviewloom-reviews--{{ block.settings.layout }}" id="reviewloom-reviews" data-product-id="{{ product.id }}" data-layout="{{ block.settings.layout }}">
+  {% if block.settings.layout == 'showcase' %}
+    <div class="reviewloom-reviews__body">
+      <aside class="reviewloom-reviews__panel">
+        <h2>{{ block.settings.heading }}</h2>
+        <div class="reviewloom-reviews__score" data-reviewloom-summary>Loading…</div>
+        <div class="reviewloom-reviews__bars" data-reviewloom-bars></div>
+        {% if block.settings.show_form %}
+          <div class="reviewloom-reviews__picker">
+            <p>Click to review</p>
+            <div class="reviewloom-reviews__picker-stars" data-reviewloom-picker>
+              <button type="button" data-rating="1" aria-label="Rate 1 star">★</button>
+              <button type="button" data-rating="2" aria-label="Rate 2 stars">★</button>
+              <button type="button" data-rating="3" aria-label="Rate 3 stars">★</button>
+              <button type="button" data-rating="4" aria-label="Rate 4 stars">★</button>
+              <button type="button" data-rating="5" aria-label="Rate 5 stars">★</button>
+            </div>
+          </div>
+        {% endif %}
+      </aside>
+      <div class="reviewloom-reviews__list" data-reviewloom-list></div>
+    </div>
+  {% else %}
+    <div class="reviewloom-reviews__header">
+      <div><h2>{{ block.settings.heading }}</h2><p class="reviewloom-reviews__summary" data-reviewloom-summary>Loading reviews...</p></div>
+      {% if block.settings.show_form %}<button class="reviewloom-reviews__button" type="button" data-reviewloom-open>Write a review</button>{% endif %}
+    </div>
+    <div class="reviewloom-reviews__list" data-reviewloom-list></div>
+  {% endif %}
   {% if block.settings.show_form %}
     <form class="reviewloom-reviews__form" id="reviewloom-form" data-reviewloom-form hidden>
       <h3>Share your experience</h3>
       <input name="product_name" type="hidden" value="{{ product.title | escape }}">
-      <label>Rating <select name="rating" required><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></label>
+      <label>Rating <select name="rating" required data-reviewloom-rating-field><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></label>
       <label>Your name <input name="reviewer" type="text" required></label>
       <label>Email <input name="email" type="email"></label>
       <label>Your review <textarea name="body" rows="4" required></textarea></label>
@@ -23,11 +46,70 @@
 (() => {
   const root = document.currentScript.previousElementSibling;
   const productId = root.dataset.productId;
+  const showcase = root.dataset.layout === 'showcase';
   const list = root.querySelector('[data-reviewloom-list]');
-  const summary = root.querySelector('.reviewloom-reviews__summary');
+  const summary = root.querySelector('[data-reviewloom-summary]');
+  const bars = root.querySelector('[data-reviewloom-bars]');
   const openButton = root.querySelector('[data-reviewloom-open]');
+  const picker = root.querySelector('[data-reviewloom-picker]');
   const form = root.querySelector('[data-reviewloom-form]');
+  const ratingField = root.querySelector('[data-reviewloom-rating-field]');
   const stars = (rating, outline) => `<span class="reviewloom-reviews__stars">${'★'.repeat(rating)}<span>${(outline ? '☆' : '★').repeat(5 - rating)}</span></span>`;
+  const initials = (name) => (name || '?').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+  const openForm = (rating) => {
+    if (!form) return;
+    if (rating && ratingField) ratingField.value = String(rating);
+    form.hidden = false;
+    form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  const votedKey = (id) => `reviewloom-voted-${id}`;
+  const renderVotes = (review) => {
+    const voted = window.localStorage ? window.localStorage.getItem(votedKey(review.id)) : null;
+    return `<div class="reviewloom-reviews__votes" data-review-id="${review.id}">
+      <button type="button" data-vote="up" ${voted ? 'disabled' : ''}>👍 <span data-count="up">${review.helpfulCount || 0}</span></button>
+      <button type="button" data-vote="down" ${voted ? 'disabled' : ''}>👎 <span data-count="down">${review.notHelpfulCount || 0}</span></button>
+    </div>`;
+  };
+
+  const renderList = (reviews, outline) => {
+    if (!reviews.length) return '<p>No reviews yet. Be the first to share your experience.</p>';
+    if (!showcase) {
+      return reviews.map((review) => `<article><div>${stars(review.rating, outline)} <strong>${review.reviewer}</strong></div><p>${review.body}</p></article>`).join('');
+    }
+    return reviews.map((review) => `<article class="reviewloom-reviews__card">
+      <div class="reviewloom-reviews__card-head">
+        <span class="reviewloom-reviews__avatar">${initials(review.reviewer)}</span>
+        <div><strong>${review.reviewer}</strong><time>${new Date(review.createdAt).toLocaleDateString()}</time></div>
+        ${stars(review.rating, outline)}
+      </div>
+      <p>${review.body}</p>
+      ${renderVotes(review)}
+    </article>`).join('');
+  };
+
+  const bindVotes = () => {
+    if (!showcase) return;
+    list.querySelectorAll('.reviewloom-reviews__votes').forEach((el) => {
+      const reviewId = el.dataset.reviewId;
+      el.querySelectorAll('button[data-vote]').forEach((button) => {
+        button.addEventListener('click', () => {
+          if (button.disabled) return;
+          el.querySelectorAll('button').forEach((b) => (b.disabled = true));
+          fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`, {
+            method: 'POST',
+            body: new URLSearchParams({ intent: 'vote', review_id: reviewId, vote: button.dataset.vote }),
+          }).then((response) => response.json()).then((result) => {
+            if (result.error) return;
+            el.querySelector('[data-count="up"]').textContent = result.helpfulCount;
+            el.querySelector('[data-count="down"]').textContent = result.notHelpfulCount;
+            if (window.localStorage) window.localStorage.setItem(votedKey(reviewId), '1');
+          });
+        });
+      });
+    });
+  };
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`, { signal: controller.signal }).then((response) => { if (!response.ok) throw new Error('bad response'); return response.json(); }).then((data) => {
@@ -36,13 +118,24 @@
     if (settings.accentColor) root.style.setProperty('--reviewloom-coral', settings.accentColor);
     if (settings.reviewFormOn === false) {
       if (openButton) openButton.hidden = true;
+      if (picker) picker.hidden = true;
       if (form) form.hidden = true;
     }
-    summary.innerHTML = `${stars(Math.round(data.average || 0), outline)} ${data.average} out of 5 · ${data.count} reviews`;
-    list.innerHTML = data.reviews.length ? data.reviews.map((review) => `<article><div>${stars(review.rating, outline)} <strong>${review.reviewer}</strong></div><p>${review.body}</p></article>`).join('') : '<p>No reviews yet. Be the first to share your experience.</p>';
+    if (showcase) {
+      summary.innerHTML = `<strong>${data.average}</strong> <span>${data.count} review${data.count === 1 ? '' : 's'}</span>`;
+      if (bars && data.distribution) {
+        bars.innerHTML = data.distribution.map((row) => `<div class="reviewloom-reviews__bar-row"><span>${row.stars} ★</span><span class="reviewloom-reviews__bar"><span style="width:${data.count ? (row.count / data.count) * 100 : 0}%"></span></span><span>${row.count}</span></div>`).join('');
+      }
+    } else {
+      summary.innerHTML = `${stars(Math.round(data.average || 0), outline)} ${data.average} out of 5 · ${data.count} reviews`;
+    }
+    list.innerHTML = renderList(data.reviews, outline);
+    bindVotes();
   }).catch(() => { summary.textContent = 'Reviews are temporarily unavailable.'; }).finally(() => clearTimeout(timeout));
+
   if (!form) return;
-  if (openButton) openButton.addEventListener('click', () => { form.hidden = false; form.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+  if (openButton) openButton.addEventListener('click', () => openForm());
+  if (picker) picker.querySelectorAll('button[data-rating]').forEach((button) => button.addEventListener('click', () => openForm(button.dataset.rating)));
   root.querySelector('[data-reviewloom-close]').addEventListener('click', () => { form.hidden = true; });
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -67,6 +160,16 @@
   "name": "All product reviews",
   "target": "section",
   "settings": [
+    {
+      "type": "select",
+      "id": "layout",
+      "label": "Layout",
+      "default": "list",
+      "options": [
+        { "value": "list", "label": "Simple list" },
+        { "value": "showcase", "label": "Showcase (rating breakdown + helpful votes)" }
+      ]
+    },
     { "type": "text", "id": "heading", "label": "Heading", "default": "What customers are saying" },
     { "type": "checkbox", "id": "show_form", "label": "Allow new reviews", "default": true }
   ]
@@ -75,10 +178,34 @@
 
 <style>
 .reviewloom-reviews { --reviewloom-coral: #d95d39; --reviewloom-ink: #17221d; color: var(--reviewloom-ink); max-width: 760px; margin: 40px auto; font-family: Georgia, serif; }
+.reviewloom-reviews--showcase { max-width: 1040px; }
 .reviewloom-reviews__header { display: flex; justify-content: space-between; align-items: end; gap: 20px; border-bottom: 1px solid #ddd4ca; padding-bottom: 14px; }
 .reviewloom-reviews h2, .reviewloom-reviews h3 { margin: 0; }.reviewloom-reviews__summary, .reviewloom-reviews__form, .reviewloom-reviews__form input, .reviewloom-reviews__form textarea, .reviewloom-reviews__form select { font-family: sans-serif; }
 .reviewloom-reviews__stars { color: var(--reviewloom-coral); letter-spacing: 2px; }.reviewloom-reviews__stars span { color: #d7cec4; }
 .reviewloom-reviews__list article { border-bottom: 1px solid #eee8e1; padding: 18px 0; }.reviewloom-reviews__list p { margin: 9px 0 0; font: 15px/1.5 sans-serif; }
 .reviewloom-reviews__button { border: 0; background: var(--reviewloom-coral); color: white; padding: 11px 16px; cursor: pointer; }.reviewloom-reviews__cancel { border: 0; background: transparent; padding: 11px 16px; cursor: pointer; }
 .reviewloom-reviews__form { background: #f5f0e8; padding: 20px; margin-top: 24px; }.reviewloom-reviews__form label { display: block; margin-top: 12px; }.reviewloom-reviews__form input, .reviewloom-reviews__form textarea, .reviewloom-reviews__form select { display: block; box-sizing: border-box; margin-top: 5px; padding: 10px; width: 100%; border: 1px solid #d9d0c5; background: white; }
+
+.reviewloom-reviews__body { display: grid; grid-template-columns: 260px 1fr; gap: 32px; align-items: start; }
+.reviewloom-reviews__panel { font-family: sans-serif; border: 1px solid #eee8e1; border-radius: 8px; padding: 20px; position: sticky; top: 20px; }
+.reviewloom-reviews__panel h2 { font-family: Georgia, serif; margin-bottom: 10px; }
+.reviewloom-reviews__score { font-size: 15px; margin-bottom: 14px; }
+.reviewloom-reviews__score strong { font-size: 34px; color: var(--reviewloom-coral); margin-right: 6px; }
+.reviewloom-reviews__bar-row { display: grid; grid-template-columns: 28px 1fr 20px; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 6px; color: #6b6258; }
+.reviewloom-reviews__bar { background: #eee8e1; border-radius: 4px; height: 8px; overflow: hidden; }
+.reviewloom-reviews__bar span { display: block; height: 100%; background: var(--reviewloom-ink); }
+.reviewloom-reviews__picker { margin-top: 18px; padding-top: 16px; border-top: 1px solid #eee8e1; }
+.reviewloom-reviews__picker p { margin: 0 0 8px; font-size: 13px; color: #6b6258; }
+.reviewloom-reviews__picker-stars { display: flex; gap: 4px; }
+.reviewloom-reviews__picker-stars button { border: 0; background: none; font-size: 22px; color: #d7cec4; cursor: pointer; padding: 0; }
+.reviewloom-reviews__picker-stars button:hover, .reviewloom-reviews__picker-stars button:hover ~ button { color: var(--reviewloom-coral); }
+.reviewloom-reviews--showcase .reviewloom-reviews__list article { border: 1px solid #eee8e1; border-radius: 8px; padding: 18px; margin-bottom: 14px; }
+.reviewloom-reviews__card-head { display: flex; align-items: center; gap: 10px; }
+.reviewloom-reviews__card-head > div { flex: 1; }
+.reviewloom-reviews__card-head time { display: block; font-size: 12px; color: #918878; }
+.reviewloom-reviews__avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--reviewloom-ink); color: white; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+.reviewloom-reviews__votes { display: flex; gap: 10px; margin-top: 10px; }
+.reviewloom-reviews__votes button { border: 1px solid #eee8e1; background: white; border-radius: 6px; padding: 5px 10px; font-size: 13px; cursor: pointer; }
+.reviewloom-reviews__votes button:disabled { opacity: 0.55; cursor: default; }
+@media (max-width: 700px) { .reviewloom-reviews__body { grid-template-columns: 1fr; } .reviewloom-reviews__panel { position: static; } }
 </style>
