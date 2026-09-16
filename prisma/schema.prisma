@@ -35,7 +35,7 @@ model Session {
 }
 
 model Review {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   shop            String
   productId       String
   productName     String
@@ -44,11 +44,24 @@ model Review {
   rating          Int
   body            String
   imageUrl        String?
-  status          String   @default("PENDING")
-  helpfulCount    Int      @default(0)
-  notHelpfulCount Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  status          String        @default("PENDING")
+  helpfulCount    Int           @default(0)
+  notHelpfulCount Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  images          ReviewImage[]
+
+  @@index([shop, productId, status])
+}
+
+model ReviewImage {
+  id       String @id @default(cuid())
+  reviewId String
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  url      String
+  position Int    @default(0)
+
+  @@index([reviewId])
 }
 
 model ReviewSettings {
