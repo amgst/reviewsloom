@@ -20,7 +20,7 @@ import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  const questions = await prisma.question.findMany({ where: { shop: session.shop }, orderBy: { createdAt: "desc" } });
+  const questions = await prisma.question.findMany({ where: { shop: session.shop }, orderBy: { createdAt: "desc" }, take: 25 });
   return json({ questions });
 };
 
