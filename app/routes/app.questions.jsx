@@ -76,11 +76,9 @@ function QuestionRow({ question }) {
               <InlineStack gap="200">
                 <Button submit variant="primary">{question.status === "PUBLISHED" ? "Update answer" : "Publish answer"}</Button>
                 {question.status === "PENDING" ? (
-                  <rejectFetcher.Form method="post">
-                    <input type="hidden" name="intent" value="reject" />
-                    <input type="hidden" name="id" value={question.id} />
-                    <Button submit>Reject</Button>
-                  </rejectFetcher.Form>
+                  <Button onClick={() => rejectFetcher.submit({ intent: "reject", id: question.id }, { method: "post" })}>
+                    Reject
+                  </Button>
                 ) : null}
               </InlineStack>
             </BlockStack>
