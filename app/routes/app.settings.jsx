@@ -26,11 +26,12 @@ export const loader = async ({ request }) => {
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const formData = await request.formData();
+  const isEnabled = (name) => formData.get(name) === "true";
   await prisma.reviewSettings.update({ where: { shop: session.shop }, data: {
     accentColor: formData.get("accentColor") || "#D95D39",
     starStyle: formData.get("starStyle") || "solid",
-    reviewFormOn: formData.get("reviewFormOn") === "on",
-    requestEmailOn: formData.get("requestEmailOn") === "on",
+    reviewFormOn: isEnabled("reviewFormOn"),
+    requestEmailOn: isEnabled("requestEmailOn"),
     senderName: formData.get("senderName") || null,
     supportEmail: formData.get("supportEmail") || null,
   } });
@@ -72,8 +73,10 @@ export default function Settings() {
               <Card>
                 <BlockStack gap="400">
                   <Text as="h2" variant="headingLg">Review collection</Text>
-                  <Checkbox label="Allow customers to submit reviews" name="reviewFormOn" checked={reviewFormOn} onChange={setReviewFormOn} />
-                  <Checkbox label="Send a basic email after fulfillment" name="requestEmailOn" checked={requestEmailOn} onChange={setRequestEmailOn} />
+                  <input type="hidden" name="reviewFormOn" value={reviewFormOn ? "true" : "false"} />
+                  <Checkbox label="Allow customers to submit reviews" checked={reviewFormOn} onChange={setReviewFormOn} />
+                  <input type="hidden" name="requestEmailOn" value={requestEmailOn ? "true" : "false"} />
+                  <Checkbox label="Send a basic email after fulfillment" checked={requestEmailOn} onChange={setRequestEmailOn} />
                 </BlockStack>
               </Card>
               <Card>
