@@ -9,8 +9,6 @@ import {
   Divider,
   InlineStack,
   Page,
-  ResourceItem,
-  ResourceList,
   Text,
   TextField,
 } from "@shopify/polaris";
@@ -57,7 +55,7 @@ function QuestionRow({ question }) {
   const rejectFetcher = useFetcher();
   const [answer, setAnswer] = useState(question.answer || "");
   return (
-    <ResourceItem id={question.id}>
+    <div className="reviewloom-section-heading" style={{ display: "block" }}>
       <BlockStack gap="200">
         <InlineStack align="space-between" blockAlign="start" gap="400" wrap={false}>
           <div>
@@ -85,7 +83,7 @@ function QuestionRow({ question }) {
           </answerFetcher.Form>
         ) : null}
       </BlockStack>
-    </ResourceItem>
+    </div>
   );
 }
 
@@ -106,7 +104,12 @@ export default function Questions() {
         </div>
         <Divider />
         {questions.length ? (
-          <ResourceList resourceName={{ singular: "question", plural: "questions" }} items={questions} renderItem={(question) => <QuestionRow question={question} />} />
+          questions.map((question, index) => (
+            <div key={question.id}>
+              {index > 0 ? <Divider /> : null}
+              <QuestionRow question={question} />
+            </div>
+          ))
         ) : (
           <div className="reviewloom-section-heading"><Text as="p" tone="subdued">No questions yet. They'll show up here as customers ask them on your product pages.</Text></div>
         )}
