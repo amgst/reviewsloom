@@ -1,4 +1,5 @@
 import { json } from "@remix-run/node";
+import { useState } from "react";
 import { useFetcher, useLoaderData } from "@remix-run/react";
 import {
   Badge,
@@ -54,6 +55,7 @@ function statusLabel(status) {
 function QuestionRow({ question }) {
   const answerFetcher = useFetcher();
   const rejectFetcher = useFetcher();
+  const [answer, setAnswer] = useState(question.answer || "");
   return (
     <ResourceItem id={question.id}>
       <BlockStack gap="200">
@@ -70,7 +72,7 @@ function QuestionRow({ question }) {
             <input type="hidden" name="intent" value="answer" />
             <input type="hidden" name="id" value={question.id} />
             <BlockStack gap="200">
-              <TextField label="Your answer" labelHidden name="answer" defaultValue={question.answer || ""} multiline={2} autoComplete="off" placeholder="Type an answer to publish it on the product page" />
+              <TextField label="Your answer" labelHidden name="answer" value={answer} onChange={setAnswer} multiline={2} autoComplete="off" placeholder="Type an answer to publish it on the product page" />
               <InlineStack gap="200">
                 <Button submit variant="primary">{question.status === "PUBLISHED" ? "Update answer" : "Publish answer"}</Button>
                 {question.status === "PENDING" ? (
