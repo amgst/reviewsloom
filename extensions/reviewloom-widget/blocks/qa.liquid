@@ -11,7 +11,7 @@
     <label>Your name <input name="asker" type="text" required></label>
     <label>Email (optional, so we can let you know when it's answered) <input name="email" type="email"></label>
     <label>Your question <textarea name="question" rows="3" required></textarea></label>
-    <div><button class="reviewloom-qa__button" type="submit">Submit question</button><button class="reviewloom-qa__cancel" type="button" data-reviewloom-qa-close>Cancel</button></div>
+    <div class="reviewloom-qa__actions"><button class="reviewloom-qa__button" type="submit">Submit question</button><button class="reviewloom-qa__cancel" type="button" data-reviewloom-qa-close>Cancel</button></div>
     <p class="reviewloom-qa__form-status" data-reviewloom-qa-status></p>
   </form>
 </section>
@@ -77,5 +77,6 @@
 .reviewloom-qa__cancel { border: 0; background: transparent; padding: 11px 16px; cursor: pointer; }
 .reviewloom-qa__form { background: #f5f0e8; padding: 20px; margin-top: 24px; }
 .reviewloom-qa__form label { display: block; margin-top: 12px; }
+.reviewloom-qa__actions { margin-top: 16px; }
 .reviewloom-qa__form input, .reviewloom-qa__form textarea { display: block; box-sizing: border-box; margin-top: 5px; padding: 10px; width: 100%; border: 1px solid #d9d0c5; background: white; }
 </style>
