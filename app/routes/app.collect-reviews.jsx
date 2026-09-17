@@ -29,9 +29,9 @@ export default function CollectReviews() {
             url="/app/requests"
           />
           <CollectCard
-            title="Import reviews"
-            description="Import reviews you already have from other platforms via CSV."
-            action="Import"
+            title="Import & export reviews"
+            description="Import reviews you already have from other platforms, or export your current reviews, via CSV."
+            action="Import / export"
             url="/app/import"
           />
           <CollectCard

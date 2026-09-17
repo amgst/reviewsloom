@@ -54,9 +54,19 @@ export default function Import() {
 
   return (
     <Page>
-      <TitleBar title="Import reviews" />
+      <TitleBar title="Import & export reviews" />
       <Layout>
         <Layout.Section>
+          <BlockStack gap="500">
+          <Card>
+            <BlockStack gap="300">
+              <Text as="h2" variant="headingLg">Export reviews to a CSV</Text>
+              <Text as="p" tone="subdued">Download all of your current reviews using the same column layout the import below expects, so you can edit them and re-import, or back them up.</Text>
+              <div>
+                <Button url="/app/export">Export reviews</Button>
+              </div>
+            </BlockStack>
+          </Card>
           <Card>
             <Form method="post">
               <BlockStack gap="400">
@@ -86,6 +96,7 @@ export default function Import() {
               </BlockStack>
             </Form>
           </Card>
+          </BlockStack>
         </Layout.Section>
       </Layout>
     </Page>
