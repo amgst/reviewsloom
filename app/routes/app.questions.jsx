@@ -1,5 +1,5 @@
 import { json } from "@remix-run/node";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFetcher, useLoaderData } from "@remix-run/react";
 import {
   Badge,
@@ -54,6 +54,18 @@ function QuestionRow({ question }) {
   const answerFetcher = useFetcher();
   const rejectFetcher = useFetcher();
   const [answer, setAnswer] = useState(question.answer || "");
+  const formRef = useRef(null);
+
+  // Grammarly and similar extensions inject themselves into controlled
+  // textareas and fight React's value updates, scrambling typed characters.
+  useEffect(() => {
+    const textarea = formRef.current?.querySelector("textarea[name='answer']");
+    if (!textarea) return;
+    textarea.setAttribute("data-gramm", "false");
+    textarea.setAttribute("data-gramm_editor", "false");
+    textarea.setAttribute("data-enable-grammarly", "false");
+  }, []);
+
   return (
     <div className="reviewloom-section-heading" style={{ display: "block" }}>
       <BlockStack gap="200">
@@ -66,7 +78,7 @@ function QuestionRow({ question }) {
           <Badge tone={statusTone(question.status)}>{statusLabel(question.status)}</Badge>
         </InlineStack>
         {question.status !== "REJECTED" ? (
-          <answerFetcher.Form method="post">
+          <answerFetcher.Form method="post" ref={formRef}>
             <input type="hidden" name="intent" value="answer" />
             <input type="hidden" name="id" value={question.id} />
             <BlockStack gap="200">
