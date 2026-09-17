@@ -31,14 +31,14 @@ export const loader = async ({ request }) => {
         take: limit,
         select: { id: true, reviewer: true, rating: true, body: true, imageUrl: true, productName: true, createdAt: true, helpfulCount: true, notHelpfulCount: true, images: { orderBy: { position: "asc" }, select: { url: true } } },
       }),
-      shop ? prisma.reviewSettings.findUnique({ where: { shop }, select: { accentColor: true, starStyle: true, reviewFormOn: true } }) : null,
+      shop ? prisma.reviewSettings.findUnique({ where: { shop }, select: { accentColor: true, starStyle: true, reviewFormOn: true, alignment: true } }) : null,
     ]);
 
     const count = ratingCounts.reduce((sum, row) => sum + row._count.rating, 0);
     const ratingSum = ratingCounts.reduce((sum, row) => sum + row.rating * row._count.rating, 0);
     const average = count ? ratingSum / count : 0;
     const distribution = [5, 4, 3, 2, 1].map((stars) => ({ stars, count: ratingCounts.find((row) => row.rating === stars)?._count.rating || 0 }));
-    const settings = { accentColor: "#D95D39", starStyle: "solid", reviewFormOn: true, ...reviewSettings };
+    const settings = { accentColor: "#D95D39", starStyle: "solid", reviewFormOn: true, alignment: "center", ...reviewSettings };
     const reviewsOut = reviews.map((review) => ({ ...review, images: [review.imageUrl, ...review.images.map((image) => image.url)].filter(Boolean) }));
 
     return json({

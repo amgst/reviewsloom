@@ -69,6 +69,7 @@ model ReviewSettings {
   shop           String  @unique
   accentColor    String  @default("#D95D39")
   starStyle      String  @default("solid")
+  alignment      String  @default("center")
   reviewFormOn   Boolean @default(true)
   requestEmailOn Boolean @default(true)
   senderName     String?

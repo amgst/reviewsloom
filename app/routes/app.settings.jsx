@@ -30,6 +30,7 @@ export const action = async ({ request }) => {
   await prisma.reviewSettings.update({ where: { shop: session.shop }, data: {
     accentColor: formData.get("accentColor") || "#D95D39",
     starStyle: formData.get("starStyle") || "solid",
+    alignment: formData.get("alignment") || "center",
     reviewFormOn: isEnabled("reviewFormOn"),
     requestEmailOn: isEnabled("requestEmailOn"),
     senderName: formData.get("senderName") || null,
@@ -43,6 +44,7 @@ export default function Settings() {
   const actionData = useActionData();
   const [accentColor, setAccentColor] = useState(settings.accentColor);
   const [starStyle, setStarStyle] = useState(settings.starStyle);
+  const [alignment, setAlignment] = useState(settings.alignment);
   const [reviewFormOn, setReviewFormOn] = useState(settings.reviewFormOn);
   const [requestEmailOn, setRequestEmailOn] = useState(settings.requestEmailOn);
   const [senderName, setSenderName] = useState(settings.senderName || "");
@@ -68,6 +70,7 @@ export default function Settings() {
                     </InlineStack>
                   </BlockStack>
                   <Select label="Star display style" name="starStyle" options={[{ label: "Solid stars", value: "solid" }, { label: "Outlined stars", value: "outline" }]} value={starStyle} onChange={setStarStyle} />
+                  <Select label="Widget alignment" name="alignment" options={[{ label: "Center", value: "center" }, { label: "Left", value: "left" }]} value={alignment} onChange={setAlignment} helpText="Where the widget sits on the product page." />
                 </BlockStack>
               </Card>
               <Card>
