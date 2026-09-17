@@ -47,6 +47,8 @@ model Review {
   status          String        @default("PENDING")
   helpfulCount    Int           @default(0)
   notHelpfulCount Int           @default(0)
+  discountCode    String?
+  deletedAt       DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   images          ReviewImage[]
@@ -74,6 +76,11 @@ model ReviewSettings {
   requestEmailOn Boolean @default(true)
   senderName     String?
   supportEmail   String?
+  customerEligibility String @default("everyone")
+  autoPublishThreshold String @default("disabled")
+  recycleBinOn         Boolean @default(false)
+  reviewDiscountPercent String @default("none")
+  onboardingCompletedAt DateTime?
 }
 
 model ReviewRequest {

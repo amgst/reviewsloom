@@ -184,7 +184,7 @@
     imageLines.forEach((line) => body.append('image_url', line));
     fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`, { method: 'POST', body, signal: controller.signal })
       .then((response) => response.json())
-      .then((result) => { status.textContent = result.error || 'Thanks. Your review is waiting for approval.'; if (!result.error) { form.reset(); state.page = 1; load(); } })
+      .then((result) => { status.textContent = result.error || (result.discountCode ? `Thanks! Your review is waiting for approval. Here's a discount code for you: ${result.discountCode}` : 'Thanks. Your review is waiting for approval.'); if (!result.error) { form.reset(); state.page = 1; load(); } })
       .catch((error) => { status.textContent = error.name === 'AbortError' ? 'This is taking longer than expected. Please try again in a moment.' : 'Something went wrong submitting your review. Please try again.'; })
       .finally(() => { clearTimeout(timeout); submitButton.disabled = false; });
   });

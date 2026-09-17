@@ -9,6 +9,7 @@ import {
   InlineStack,
   Layout,
   Page,
+  RadioButton,
   Select,
   Text,
   TextField,
@@ -20,7 +21,7 @@ import prisma from "../db.server";
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const settings = await prisma.reviewSettings.upsert({ where: { shop: session.shop }, update: {}, create: { shop: session.shop } });
-  return json({ settings });
+  return json({ settings, shop: session.shop });
 };
 
 export const action = async ({ request }) => {
@@ -35,12 +36,16 @@ export const action = async ({ request }) => {
     requestEmailOn: isEnabled("requestEmailOn"),
     senderName: formData.get("senderName") || null,
     supportEmail: formData.get("supportEmail") || null,
+    customerEligibility: formData.get("customerEligibility") || "everyone",
+    autoPublishThreshold: formData.get("autoPublishThreshold") || "disabled",
+    recycleBinOn: isEnabled("recycleBinOn"),
+    reviewDiscountPercent: formData.get("reviewDiscountPercent") || "none",
   } });
   return json({ saved: true });
 };
 
 export default function Settings() {
-  const { settings } = useLoaderData();
+  const { settings, shop } = useLoaderData();
   const actionData = useActionData();
   const [accentColor, setAccentColor] = useState(settings.accentColor);
   const [starStyle, setStarStyle] = useState(settings.starStyle);
@@ -49,12 +54,26 @@ export default function Settings() {
   const [requestEmailOn, setRequestEmailOn] = useState(settings.requestEmailOn);
   const [senderName, setSenderName] = useState(settings.senderName || "");
   const [supportEmail, setSupportEmail] = useState(settings.supportEmail || "");
+  const [customerEligibility, setCustomerEligibility] = useState(settings.customerEligibility || "everyone");
+  const [autoPublishThreshold, setAutoPublishThreshold] = useState(settings.autoPublishThreshold || "disabled");
+  const [recycleBinOn, setRecycleBinOn] = useState(settings.recycleBinOn || false);
+  const [reviewDiscountPercent, setReviewDiscountPercent] = useState(settings.reviewDiscountPercent || "none");
 
   return (
     <Page>
       <TitleBar title="Settings" />
       <Layout>
         <Layout.Section>
+          <BlockStack gap="500">
+            <Card>
+              <BlockStack gap="300">
+                <Text as="h2" variant="headingLg">Change your theme</Text>
+                <Text as="p" tone="subdued">If you switch themes, re-add the Reviewloom app block from the theme editor's App embeds panel so reviews keep showing on product pages.</Text>
+                <InlineStack>
+                  <Button url={`https://${shop}/admin/themes/current/editor?context=apps`} target="_blank">Open theme editor</Button>
+                </InlineStack>
+              </BlockStack>
+            </Card>
           <Form method="post">
             <BlockStack gap="500">
               <Card>
@@ -75,11 +94,117 @@ export default function Settings() {
               </Card>
               <Card>
                 <BlockStack gap="400">
+                  <Text as="h2" variant="headingLg">Customer eligibility</Text>
+                  <input type="hidden" name="customerEligibility" value={customerEligibility} />
+                  <BlockStack gap="200">
+                    <RadioButton
+                      label="Only customers logged in can write reviews"
+                      checked={customerEligibility === "loggedIn"}
+                      id="customerEligibility-loggedIn"
+                      name="customerEligibility-display"
+                      onChange={() => setCustomerEligibility("loggedIn")}
+                    />
+                    <RadioButton
+                      label="Only verified buyers can write reviews"
+                      checked={customerEligibility === "verifiedBuyer"}
+                      id="customerEligibility-verifiedBuyer"
+                      name="customerEligibility-display"
+                      onChange={() => setCustomerEligibility("verifiedBuyer")}
+                    />
+                    <RadioButton
+                      label="Everyone can write reviews"
+                      checked={customerEligibility === "everyone"}
+                      id="customerEligibility-everyone"
+                      name="customerEligibility-display"
+                      onChange={() => setCustomerEligibility("everyone")}
+                    />
+                  </BlockStack>
+                </BlockStack>
+              </Card>
+              <Card>
+                <BlockStack gap="400">
+                  <Text as="h2" variant="headingLg">Auto-publish positive reviews</Text>
+                  <Text as="p" tone="subdued">After 14 days, any uncurated reviews will be automatically published. We highly recommend publishing all valid reviews as soon as possible.</Text>
+                  <input type="hidden" name="autoPublishThreshold" value={autoPublishThreshold} />
+                  <BlockStack gap="200">
+                    <RadioButton
+                      label="5 stars reviews"
+                      checked={autoPublishThreshold === "5stars"}
+                      id="autoPublishThreshold-5stars"
+                      name="autoPublishThreshold-display"
+                      onChange={() => setAutoPublishThreshold("5stars")}
+                    />
+                    <RadioButton
+                      label="4 stars and up"
+                      checked={autoPublishThreshold === "4plus"}
+                      id="autoPublishThreshold-4plus"
+                      name="autoPublishThreshold-display"
+                      onChange={() => setAutoPublishThreshold("4plus")}
+                    />
+                    <RadioButton
+                      label="All reviews"
+                      checked={autoPublishThreshold === "all"}
+                      id="autoPublishThreshold-all"
+                      name="autoPublishThreshold-display"
+                      onChange={() => setAutoPublishThreshold("all")}
+                    />
+                    <RadioButton
+                      label="Disabled"
+                      checked={autoPublishThreshold === "disabled"}
+                      id="autoPublishThreshold-disabled"
+                      name="autoPublishThreshold-display"
+                      onChange={() => setAutoPublishThreshold("disabled")}
+                    />
+                  </BlockStack>
+                </BlockStack>
+              </Card>
+              <Card>
+                <BlockStack gap="400">
                   <Text as="h2" variant="headingLg">Review collection</Text>
                   <input type="hidden" name="reviewFormOn" value={reviewFormOn ? "true" : "false"} />
                   <Checkbox label="Allow customers to submit reviews" checked={reviewFormOn} onChange={setReviewFormOn} />
                   <input type="hidden" name="requestEmailOn" value={requestEmailOn ? "true" : "false"} />
                   <Checkbox label="Send a basic email after fulfillment" checked={requestEmailOn} onChange={setRequestEmailOn} />
+                </BlockStack>
+              </Card>
+              <Card>
+                <InlineStack align="space-between" blockAlign="center">
+                  <BlockStack gap="100">
+                    <Text as="h2" variant="headingLg">Recycle bin</Text>
+                    <Text as="p" tone="subdued">When on, deleted reviews move to the trash for 30 days instead of being removed immediately.</Text>
+                  </BlockStack>
+                  <input type="hidden" name="recycleBinOn" value={recycleBinOn ? "true" : "false"} />
+                  <Checkbox label="Enable recycle bin" labelHidden checked={recycleBinOn} onChange={setRecycleBinOn} />
+                </InlineStack>
+              </Card>
+              <Card>
+                <BlockStack gap="400">
+                  <Text as="h2" variant="headingLg">Discount for reviewers</Text>
+                  <Text as="p" tone="subdued">Reward customers with a one-time discount code after they submit a review.</Text>
+                  <input type="hidden" name="reviewDiscountPercent" value={reviewDiscountPercent} />
+                  <BlockStack gap="200">
+                    <RadioButton
+                      label="10% discount"
+                      checked={reviewDiscountPercent === "10"}
+                      id="reviewDiscountPercent-10"
+                      name="reviewDiscountPercent-display"
+                      onChange={() => setReviewDiscountPercent("10")}
+                    />
+                    <RadioButton
+                      label="20% discount"
+                      checked={reviewDiscountPercent === "20"}
+                      id="reviewDiscountPercent-20"
+                      name="reviewDiscountPercent-display"
+                      onChange={() => setReviewDiscountPercent("20")}
+                    />
+                    <RadioButton
+                      label="No discount"
+                      checked={reviewDiscountPercent === "none"}
+                      id="reviewDiscountPercent-none"
+                      name="reviewDiscountPercent-display"
+                      onChange={() => setReviewDiscountPercent("none")}
+                    />
+                  </BlockStack>
                 </BlockStack>
               </Card>
               <Card>
@@ -93,6 +218,7 @@ export default function Settings() {
               {actionData?.saved ? <Text tone="success">Settings saved.</Text> : null}
             </BlockStack>
           </Form>
+          </BlockStack>
         </Layout.Section>
         <Layout.Section variant="oneThird">
           <Card>

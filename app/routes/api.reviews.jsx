@@ -1,5 +1,7 @@
 import { json } from "@remix-run/node";
 import prisma from "../db.server";
+import { autoPublishEligibleReviews } from "../reviews.server";
+import { createReviewDiscountCode } from "../discounts.server";
 
 const SORTS = {
   relevance: [{ helpfulCount: "desc" }, { createdAt: "desc" }],
@@ -18,7 +20,9 @@ export const loader = async ({ request }) => {
     const star = Number(url.searchParams.get("star")) || null;
     const sort = SORTS[url.searchParams.get("sort")] ? url.searchParams.get("sort") : "relevance";
 
-    const baseWhere = { ...(shop ? { shop } : {}), ...(productId ? { productId } : {}), status: "APPROVED" };
+    if (shop) await autoPublishEligibleReviews(shop);
+
+    const baseWhere = { ...(shop ? { shop } : {}), ...(productId ? { productId } : {}), status: "APPROVED", deletedAt: null };
     const pageWhere = { ...baseWhere, ...(star ? { rating: star } : {}) };
 
     const [ratingCounts, filteredCount, reviews, reviewSettings] = await Promise.all([
@@ -81,8 +85,9 @@ export const action = async ({ request }) => {
       return json({ error: "A product, rating, name, and review are required." }, { status: 400 });
     }
     const imageUrls = formData.getAll("image_url").map((value) => String(value).trim()).filter(Boolean).slice(0, 6);
+    const shop = url.searchParams.get("shop") || request.headers.get("x-shopify-shop-domain") || "unknown";
     const review = await prisma.review.create({ data: {
-      shop: url.searchParams.get("shop") || request.headers.get("x-shopify-shop-domain") || "unknown",
+      shop,
       productId: url.searchParams.get("product_id"),
       productName: formData.get("product_name") || "Product review",
       reviewer: formData.get("reviewer"),
@@ -92,7 +97,20 @@ export const action = async ({ request }) => {
       status: "PENDING",
       images: imageUrls.length ? { create: imageUrls.map((imgUrl, position) => ({ url: imgUrl, position })) } : undefined,
     } });
-    return json({ review: { id: review.id, status: review.status } }, { status: 201 });
+
+    let discountCode = null;
+    const reviewSettings = await prisma.reviewSettings.findUnique({ where: { shop }, select: { reviewDiscountPercent: true } });
+    const percent = Number(reviewSettings?.reviewDiscountPercent);
+    if (percent > 0) {
+      try {
+        discountCode = await createReviewDiscountCode(shop, percent);
+        await prisma.review.update({ where: { id: review.id }, data: { discountCode } });
+      } catch (error) {
+        console.error("[api.reviews] discount code creation failed", error);
+      }
+    }
+
+    return json({ review: { id: review.id, status: review.status }, discountCode }, { status: 201 });
   } catch (error) {
     console.error("[api.reviews] action failed", error);
     return json({ error: "Something went wrong. Please try again." }, { status: 500 });

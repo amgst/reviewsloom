@@ -23,7 +23,9 @@ export default function App() {
           Reviews
         </Link>
         <Link to="/app/questions">Q&amp;A</Link>
-        <Link to="/app/requests">Send request</Link>
+        <Link to="/app/collect-reviews">Collect reviews</Link>
+        <Link to="/app/analytics">Analytics</Link>
+        <Link to="/app/trash">Trash</Link>
         <Link to="/app/settings">Settings</Link>
       </NavMenu>
       <Outlet />
