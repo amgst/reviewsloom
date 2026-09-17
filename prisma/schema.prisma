@@ -93,6 +93,8 @@ model ReviewRequest {
   emailId     String?
   error       String?
   sentAt      DateTime @default(now())
+
+  @@index([shop, sentAt])
 }
 
 model Question {
@@ -108,4 +110,6 @@ model Question {
   status      String    @default("PENDING")
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@index([shop, createdAt])
 }

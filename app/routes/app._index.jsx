@@ -26,20 +26,24 @@ const demoReviews = [
   { productId: "demo-3", productName: "Ribbed everyday socks", reviewer: "Priya Shah", email: "priya@example.com", rating: 3, body: "Comfortable, though I would love a few more color options.", status: "PENDING" },
 ];
 
-async function ensureDemoData(shop) {
-  const count = await prisma.review.count({ where: { shop } });
-  if (!count) await prisma.review.createMany({ data: demoReviews.map((review) => ({ ...review, shop })) });
-  await prisma.reviewSettings.upsert({ where: { shop }, update: {}, create: { shop } });
+// Seeding only ever needs to run once per shop, so check first instead of
+// paying for an upsert (and a demo-data count query) on every dashboard load.
+async function ensureShopInitialized(shop) {
+  let settings = await prisma.reviewSettings.findUnique({ where: { shop } });
+  if (!settings) {
+    [settings] = await Promise.all([
+      prisma.reviewSettings.create({ data: { shop } }),
+      prisma.review.createMany({ data: demoReviews.map((review) => ({ ...review, shop })) }),
+    ]);
+  }
+  return settings;
 }
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  await ensureDemoData(session.shop);
-  await autoPublishEligibleReviews(session.shop);
-  const [reviews, settings] = await Promise.all([
-    prisma.review.findMany({ where: { shop: session.shop, deletedAt: null }, orderBy: { createdAt: "desc" } }),
-    prisma.reviewSettings.findUnique({ where: { shop: session.shop } }),
-  ]);
+  const settings = await ensureShopInitialized(session.shop);
+  await autoPublishEligibleReviews(session.shop, settings.autoPublishThreshold);
+  const reviews = await prisma.review.findMany({ where: { shop: session.shop, deletedAt: null }, orderBy: { createdAt: "desc" } });
   return json({ reviews, settings });
 };
 

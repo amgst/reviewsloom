@@ -20,12 +20,15 @@ export const loader = async ({ request }) => {
     const star = Number(url.searchParams.get("star")) || null;
     const sort = SORTS[url.searchParams.get("sort")] ? url.searchParams.get("sort") : "relevance";
 
-    if (shop) await autoPublishEligibleReviews(shop);
+    const reviewSettings = shop
+      ? await prisma.reviewSettings.findUnique({ where: { shop }, select: { accentColor: true, starStyle: true, reviewFormOn: true, alignment: true, autoPublishThreshold: true } })
+      : null;
+    if (shop) await autoPublishEligibleReviews(shop, reviewSettings?.autoPublishThreshold);
 
     const baseWhere = { ...(shop ? { shop } : {}), ...(productId ? { productId } : {}), status: "APPROVED", deletedAt: null };
     const pageWhere = { ...baseWhere, ...(star ? { rating: star } : {}) };
 
-    const [ratingCounts, filteredCount, reviews, reviewSettings] = await Promise.all([
+    const [ratingCounts, filteredCount, reviews] = await Promise.all([
       prisma.review.groupBy({ by: ["rating"], where: baseWhere, _count: { rating: true } }),
       prisma.review.count({ where: pageWhere }),
       prisma.review.findMany({
@@ -35,7 +38,6 @@ export const loader = async ({ request }) => {
         take: limit,
         select: { id: true, reviewer: true, rating: true, body: true, imageUrl: true, productName: true, createdAt: true, helpfulCount: true, notHelpfulCount: true, images: { orderBy: { position: "asc" }, select: { url: true } } },
       }),
-      shop ? prisma.reviewSettings.findUnique({ where: { shop }, select: { accentColor: true, starStyle: true, reviewFormOn: true, alignment: true } }) : null,
     ]);
 
     const count = ratingCounts.reduce((sum, row) => sum + row._count.rating, 0);

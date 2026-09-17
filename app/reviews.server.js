@@ -10,10 +10,14 @@ const THRESHOLD_FILTERS = {
 };
 
 // No background job runner exists yet, so eligible reviews are promoted lazily
-// whenever the admin or storefront reads reviews for a shop.
-export async function autoPublishEligibleReviews(shop) {
-  const settings = await prisma.reviewSettings.findUnique({ where: { shop }, select: { autoPublishThreshold: true } });
-  const filter = settings && THRESHOLD_FILTERS[settings.autoPublishThreshold];
+// whenever the admin or storefront reads reviews for a shop. Pass `threshold`
+// when the caller already has it, to avoid an extra settings lookup here.
+export async function autoPublishEligibleReviews(shop, threshold) {
+  if (threshold === undefined) {
+    const settings = await prisma.reviewSettings.findUnique({ where: { shop }, select: { autoPublishThreshold: true } });
+    threshold = settings?.autoPublishThreshold;
+  }
+  const filter = threshold && THRESHOLD_FILTERS[threshold];
   if (!filter) return;
   const cutoff = new Date(Date.now() - AUTO_PUBLISH_DAYS * 24 * 60 * 60 * 1000);
   await prisma.review.updateMany({

@@ -20,7 +20,8 @@ import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  const settings = await prisma.reviewSettings.upsert({ where: { shop: session.shop }, update: {}, create: { shop: session.shop } });
+  let settings = await prisma.reviewSettings.findUnique({ where: { shop: session.shop } });
+  if (!settings) settings = await prisma.reviewSettings.create({ data: { shop: session.shop } });
   return json({ settings, shop: session.shop });
 };
 
@@ -28,6 +29,12 @@ export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const formData = await request.formData();
   const isEnabled = (name) => formData.get(name) === "true";
+
+  if (formData.get("intent") === "restart-onboarding") {
+    await prisma.reviewSettings.update({ where: { shop: session.shop }, data: { onboardingCompletedAt: null } });
+    return json({ restarted: true });
+  }
+
   await prisma.reviewSettings.update({ where: { shop: session.shop }, data: {
     accentColor: formData.get("accentColor") || "#D95D39",
     starStyle: formData.get("starStyle") || "solid",
@@ -72,6 +79,19 @@ export default function Settings() {
                 <InlineStack>
                   <Button url={`https://${shop}/admin/themes/current/editor?context=apps`} target="_blank">Open theme editor</Button>
                 </InlineStack>
+              </BlockStack>
+            </Card>
+            <Card>
+              <BlockStack gap="300">
+                <Text as="h2" variant="headingLg">Setup wizard</Text>
+                <Text as="p" tone="subdued">Restart the quick setup wizard to walk through enabling reviews, customer eligibility, and reviewer discounts again.</Text>
+                <Form method="post">
+                  <input type="hidden" name="intent" value="restart-onboarding" />
+                  <InlineStack gap="200" blockAlign="center">
+                    <Button submit>Restart setup wizard</Button>
+                    {actionData?.restarted ? <Text tone="success">Wizard reset — open the dashboard to run it again.</Text> : null}
+                  </InlineStack>
+                </Form>
               </BlockStack>
             </Card>
           <Form method="post">
