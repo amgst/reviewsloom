@@ -18,7 +18,6 @@ export default function App() {
 
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
-      <script src="https://cdn.shopify.com/shopifycloud/polaris-1.js" />
       <NavMenu>
         <Link to="/app" rel="home">
           Reviews
