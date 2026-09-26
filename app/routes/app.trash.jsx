@@ -20,8 +20,13 @@ const TRASH_RETENTION_DAYS = 30;
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  await purgeExpiredTrash(session.shop);
-  const reviews = await prisma.review.findMany({ where: { shop: session.shop, deletedAt: { not: null } }, orderBy: { deletedAt: "desc" } });
+  // Purge and list run together (one round trip, not two): the list query
+  // already excludes anything past retention, which is exactly what the purge removes.
+  const cutoff = new Date(Date.now() - TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  const [, reviews] = await Promise.all([
+    purgeExpiredTrash(session.shop),
+    prisma.review.findMany({ where: { shop: session.shop, deletedAt: { gt: cutoff } }, orderBy: { deletedAt: "desc" } }),
+  ]);
   return json({ reviews });
 };
 

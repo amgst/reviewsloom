@@ -26,24 +26,31 @@ const demoReviews = [
   { productId: "demo-3", productName: "Ribbed everyday socks", reviewer: "Priya Shah", email: "priya@example.com", rating: 3, body: "Comfortable, though I would love a few more color options.", status: "PENDING" },
 ];
 
-// Seeding only ever needs to run once per shop, so check first instead of
-// paying for an upsert (and a demo-data count query) on every dashboard load.
-async function ensureShopInitialized(shop) {
-  let settings = await prisma.reviewSettings.findUnique({ where: { shop } });
-  if (!settings) {
-    [settings] = await Promise.all([
-      prisma.reviewSettings.create({ data: { shop } }),
-      prisma.review.createMany({ data: demoReviews.map((review) => ({ ...review, shop })) }),
-    ]);
-  }
+// Seeding only ever needs to run once per shop, so it's only reached when the
+// settings lookup comes back empty - not paid for on every dashboard load.
+async function seedShop(shop) {
+  const [settings] = await Promise.all([
+    prisma.reviewSettings.create({ data: { shop } }),
+    prisma.review.createMany({ data: demoReviews.map((review) => ({ ...review, shop })) }),
+  ]);
   return settings;
 }
 
+const listReviews = (shop) => prisma.review.findMany({ where: { shop, deletedAt: null }, orderBy: { createdAt: "desc" } });
+
+// Every query here is a network round trip to the database, so settings and
+// reviews are read together; reviews are only re-read in the rare case where
+// seeding or auto-publish just changed them.
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  const settings = await ensureShopInitialized(session.shop);
-  await autoPublishEligibleReviews(session.shop, settings.autoPublishThreshold);
-  const reviews = await prisma.review.findMany({ where: { shop: session.shop, deletedAt: null }, orderBy: { createdAt: "desc" } });
+  const { shop } = session;
+  let [settings, reviews] = await Promise.all([prisma.reviewSettings.findUnique({ where: { shop } }), listReviews(shop)]);
+  if (!settings) {
+    settings = await seedShop(shop);
+    reviews = await listReviews(shop);
+  } else if (await autoPublishEligibleReviews(shop, settings.autoPublishThreshold)) {
+    reviews = await listReviews(shop);
+  }
   return json({ reviews, settings });
 };
 

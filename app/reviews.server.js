@@ -12,18 +12,21 @@ const THRESHOLD_FILTERS = {
 // No background job runner exists yet, so eligible reviews are promoted lazily
 // whenever the admin or storefront reads reviews for a shop. Pass `threshold`
 // when the caller already has it, to avoid an extra settings lookup here.
+// Returns how many reviews were promoted, so callers can skip re-reading when
+// nothing changed.
 export async function autoPublishEligibleReviews(shop, threshold) {
   if (threshold === undefined) {
     const settings = await prisma.reviewSettings.findUnique({ where: { shop }, select: { autoPublishThreshold: true } });
     threshold = settings?.autoPublishThreshold;
   }
   const filter = threshold && THRESHOLD_FILTERS[threshold];
-  if (!filter) return;
+  if (!filter) return 0;
   const cutoff = new Date(Date.now() - AUTO_PUBLISH_DAYS * 24 * 60 * 60 * 1000);
-  await prisma.review.updateMany({
+  const { count } = await prisma.review.updateMany({
     where: { shop, status: "PENDING", deletedAt: null, createdAt: { lte: cutoff }, ...filter },
     data: { status: "APPROVED" },
   });
+  return count;
 }
 
 // Same lazy-sweep approach as auto-publish: purge trash past its retention
