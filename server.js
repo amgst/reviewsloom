@@ -1,4 +1,5 @@
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import compression from "compression";
 import express from "express";
@@ -19,6 +20,28 @@ const canonicalHost = process.env.SHOPIFY_APP_URL
 
 const app = express();
 app.disable("x-powered-by");
+app.use((req, res, next) => {
+  const started = Date.now();
+  const requestId = randomUUID();
+  res.setHeader("X-Request-Id", requestId);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.on("finish", () => {
+    const durationMs = Date.now() - started;
+    if (res.statusCode >= 500 || durationMs > 1500)
+      console.log(
+        JSON.stringify({
+          event: "http.request",
+          requestId,
+          method: req.method,
+          path: req.path,
+          status: res.statusCode,
+          durationMs,
+        }),
+      );
+  });
+  next();
+});
 app.use(compression());
 
 if (canonicalHost) {

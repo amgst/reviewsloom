@@ -1,10 +1,11 @@
-<section class="reviewloom-carousel" data-reviewloom-carousel>
+<section class="reviewloom-carousel" data-reviewloom-carousel {{ block.shopify_attributes }}>
   <div class="reviewloom-carousel__heading"><h2>{{ block.settings.heading }}</h2><div><button type="button" data-reviewloom-prev aria-label="Previous review">←</button><button type="button" data-reviewloom-next aria-label="Next review">→</button></div></div>
   <div class="reviewloom-carousel__track" data-reviewloom-carousel-track><p>Loading reviews...</p></div>
 </section>
 <script>
 (() => {
   const root = document.currentScript.previousElementSibling;
+  const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const track = root.querySelector('[data-reviewloom-carousel-track]');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
@@ -13,7 +14,7 @@
     const outline = settings.starStyle === 'outline';
     if (settings.accentColor) root.style.setProperty('--reviewloom-coral', settings.accentColor);
     if (!data.reviews.length) { track.innerHTML = '<p>No reviews yet.</p>'; return; }
-    track.innerHTML = data.reviews.map((review) => `<article><span class="reviewloom-carousel__stars">${'★'.repeat(review.rating)}<span>${(outline ? '☆' : '★').repeat(5 - review.rating)}</span></span><p>“${review.body}”</p><strong>${review.reviewer}</strong><small>${review.productName}</small></article>`).join(''); const cards = [...track.children]; let current = 0; const show = () => cards.forEach((card, index) => { card.hidden = index !== current; }); root.querySelector('[data-reviewloom-prev]').onclick = () => { current = (current - 1 + cards.length) % cards.length; show(); }; root.querySelector('[data-reviewloom-next]').onclick = () => { current = (current + 1) % cards.length; show(); }; show();
+    track.innerHTML = data.reviews.map((review) => `<article><span class="reviewloom-carousel__stars">${'★'.repeat(review.rating)}<span>${(outline ? '☆' : '★').repeat(5 - review.rating)}</span></span><p>“${escapeHtml(review.body)}”</p><strong>${escapeHtml(review.reviewer)}</strong><small>${escapeHtml(review.productName)}</small></article>`).join(''); const cards = [...track.children]; let current = 0; const show = () => cards.forEach((card, index) => { card.hidden = index !== current; }); root.querySelector('[data-reviewloom-prev]').onclick = () => { current = (current - 1 + cards.length) % cards.length; show(); }; root.querySelector('[data-reviewloom-next]').onclick = () => { current = (current + 1) % cards.length; show(); }; show();
   }).catch(() => { track.innerHTML = '<p>Reviews are temporarily unavailable.</p>'; }).finally(() => clearTimeout(timeout));
 })();
 </script>

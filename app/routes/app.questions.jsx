@@ -18,7 +18,11 @@ import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  const questions = await prisma.question.findMany({ where: { shop: session.shop }, orderBy: { createdAt: "desc" }, take: 25 });
+  const questions = await prisma.question.findMany({
+    where: { shop: session.shop },
+    orderBy: { createdAt: "desc" },
+    take: 25,
+  });
   return json({ questions });
 };
 
@@ -27,13 +31,29 @@ export const action = async ({ request }) => {
   const formData = await request.formData();
   const intent = formData.get("intent");
   const id = formData.get("id");
-  const question = await prisma.question.findFirst({ where: { id, shop: session.shop } });
+  const question = await prisma.question.findFirst({
+    where: { id, shop: session.shop },
+  });
   if (!question) return json({ error: "Question not found." }, { status: 404 });
+  if (!["answer", "reject"].includes(intent))
+    return json({ error: "Invalid question action." }, { status: 400 });
   if (intent === "answer") {
-    await prisma.question.update({ where: { id }, data: { answer: formData.get("answer") || "", status: "PUBLISHED", answeredAt: new Date() } });
+    const answer = String(formData.get("answer") || "").trim();
+    if (!answer || answer.length > 5000)
+      return json(
+        { error: "Enter an answer of 1–5000 characters." },
+        { status: 400 },
+      );
+    await prisma.question.updateMany({
+      where: { id, shop: session.shop },
+      data: { answer, status: "PUBLISHED", answeredAt: new Date() },
+    });
   }
   if (intent === "reject") {
-    await prisma.question.update({ where: { id }, data: { status: "REJECTED" } });
+    await prisma.question.updateMany({
+      where: { id, shop: session.shop },
+      data: { status: "REJECTED" },
+    });
   }
   return json({ ok: true });
 };
@@ -69,28 +89,70 @@ function QuestionRow({ question }) {
   return (
     <div className="reviewloom-section-heading" style={{ display: "block" }}>
       <BlockStack gap="200">
-        <InlineStack align="space-between" blockAlign="start" gap="400" wrap={false}>
+        <InlineStack
+          align="space-between"
+          blockAlign="start"
+          gap="400"
+          wrap={false}
+        >
           <div>
-            <Text as="h3" variant="headingMd">{question.productName}</Text>
+            <Text as="h3" variant="headingMd">
+              {question.productName}
+            </Text>
             <Text as="p">&quot;{question.question}&quot;</Text>
-            <Text as="p" tone="subdued">{question.asker}{question.email ? ` · ${question.email}` : ""}</Text>
+            <Text as="p" tone="subdued">
+              {question.asker}
+              {question.email ? ` · ${question.email}` : ""}
+            </Text>
           </div>
-          <Badge tone={statusTone(question.status)}>{statusLabel(question.status)}</Badge>
+          <Badge tone={statusTone(question.status)}>
+            {statusLabel(question.status)}
+          </Badge>
         </InlineStack>
         {question.status !== "REJECTED" ? (
           <answerFetcher.Form method="post" ref={formRef}>
             <input type="hidden" name="intent" value="answer" />
             <input type="hidden" name="id" value={question.id} />
             <BlockStack gap="200">
-              <TextField label="Your answer" labelHidden name="answer" value={answer} onChange={setAnswer} multiline={2} autoComplete="off" placeholder="Type an answer to publish it on the product page" />
+              <TextField
+                label="Your answer"
+                labelHidden
+                name="answer"
+                value={answer}
+                onChange={setAnswer}
+                multiline={2}
+                autoComplete="off"
+                placeholder="Type an answer to publish it on the product page"
+              />
               <InlineStack gap="200">
-                <Button submit variant="primary">{question.status === "PUBLISHED" ? "Update answer" : "Publish answer"}</Button>
+                <Button
+                  submit
+                  variant="primary"
+                  disabled={!answer.trim() || answerFetcher.state !== "idle"}
+                  loading={answerFetcher.state !== "idle"}
+                >
+                  {question.status === "PUBLISHED"
+                    ? "Update answer"
+                    : "Publish answer"}
+                </Button>
                 {question.status === "PENDING" ? (
-                  <Button onClick={() => rejectFetcher.submit({ intent: "reject", id: question.id }, { method: "post" })}>
+                  <Button
+                    onClick={() =>
+                      rejectFetcher.submit(
+                        { intent: "reject", id: question.id },
+                        { method: "post" },
+                      )
+                    }
+                  >
                     Reject
                   </Button>
                 ) : null}
               </InlineStack>
+              <div role="status">
+                {answerFetcher.data?.error ||
+                  rejectFetcher.data?.error ||
+                  (answerFetcher.data?.ok ? "Answer saved." : "")}
+              </div>
             </BlockStack>
           </answerFetcher.Form>
         ) : null}
@@ -109,10 +171,17 @@ export default function Questions() {
       <Card padding="0">
         <div className="reviewloom-section-heading">
           <div>
-            <Text as="h2" variant="headingLg">Customer questions</Text>
-            <Text as="p" tone="subdued">Answer a question to publish it on the product page. Rejecting hides it from the storefront.</Text>
+            <Text as="h2" variant="headingLg">
+              Customer questions
+            </Text>
+            <Text as="p" tone="subdued">
+              Answer a question to publish it on the product page. Rejecting
+              hides it from the storefront.
+            </Text>
           </div>
-          <Badge tone={pending.length ? "attention" : "success"}>{pending.length ? `${pending.length} to answer` : "All caught up"}</Badge>
+          <Badge tone={pending.length ? "attention" : "success"}>
+            {pending.length ? `${pending.length} to answer` : "All caught up"}
+          </Badge>
         </div>
         <Divider />
         {questions.length ? (
@@ -123,7 +192,12 @@ export default function Questions() {
             </div>
           ))
         ) : (
-          <div className="reviewloom-section-heading"><Text as="p" tone="subdued">No questions yet. They'll show up here as customers ask them on your product pages.</Text></div>
+          <div className="reviewloom-section-heading">
+            <Text as="p" tone="subdued">
+              No questions yet. They'll show up here as customers ask them on
+              your product pages.
+            </Text>
+          </div>
         )}
       </Card>
     </Page>

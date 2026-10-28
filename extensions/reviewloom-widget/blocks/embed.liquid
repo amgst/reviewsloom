@@ -1,5 +1,5 @@
 {% if request.page_type == 'product' and product %}
-<section class="reviewloom-reviews reviewloom-embed" id="reviewloom-reviews" data-product-id="{{ product.id }}">
+<section class="reviewloom-reviews reviewloom-embed" id="reviewloom-reviews" data-product-id="{{ product.id }}" {{ block.shopify_attributes }}>
   <div class="reviewloom-reviews__header">
     <div><h2>{{ block.settings.heading }}</h2><p class="reviewloom-reviews__summary">Loading reviews...</p></div>
     {% if block.settings.show_form %}<button class="reviewloom-reviews__button" type="button" data-reviewloom-open>Write a review</button>{% endif %}
@@ -15,13 +15,14 @@
       <label>Your review <textarea name="body" rows="4" required></textarea></label>
       <label>Photo URL (optional) <input name="image_url" type="url"></label>
       <div><button class="reviewloom-reviews__button" type="submit">Submit for review</button><button class="reviewloom-reviews__cancel" type="button" data-reviewloom-close>Cancel</button></div>
-      <p class="reviewloom-reviews__form-status" data-reviewloom-status></p>
+      <p class="reviewloom-reviews__form-status" data-reviewloom-status role="status" aria-live="polite"></p>
     </form>
   {% endif %}
 </section>
 <script>
 (() => {
   const root = document.currentScript.previousElementSibling;
+  const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   if ({{ block.settings.position | json }} === 'after_selector') {
     let anchor = null;
     try { anchor = document.querySelector({{ block.settings.anchor_selector | json }}); } catch (error) { anchor = null; }
@@ -46,8 +47,14 @@
       if (openButton) openButton.hidden = true;
       if (form) form.hidden = true;
     }
+    const requestToken = new URLSearchParams(location.search).get('reviewloom_request');
+    if (settings.customerEligibility === 'verifiedBuyer' && !requestToken && openButton) {
+      openButton.disabled = true;
+      openButton.textContent = 'Use your purchase invitation to review';
+    }
+    if (requestToken && settings.reviewFormOn !== false && form) form.hidden = false;
     summary.innerHTML = `${stars(Math.round(data.average || 0), outline)} ${data.average} out of 5 · ${data.count} reviews`;
-    list.innerHTML = data.reviews.length ? data.reviews.map((review) => `<article><div>${stars(review.rating, outline)} <strong>${review.reviewer}</strong></div><p>${review.body}</p></article>`).join('') : '<p>No reviews yet. Be the first to share your experience.</p>';
+    list.innerHTML = data.reviews.length ? data.reviews.map((review) => `<article><div>${stars(review.rating, outline)} <strong>${escapeHtml(review.reviewer)}</strong> ${review.verifiedPurchase ? '<small>Verified purchase</small>' : ''}</div><p>${escapeHtml(review.body)}</p></article>`).join('') : '<p>No reviews yet. Be the first to share your experience.</p>';
   }).catch(() => { summary.textContent = 'Reviews are temporarily unavailable.'; }).finally(() => clearTimeout(timeout));
   if (!form) return;
   if (openButton) openButton.addEventListener('click', () => { form.hidden = false; form.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
@@ -60,7 +67,10 @@
     const timeout = setTimeout(() => controller.abort(), 25000);
     submitButton.disabled = true;
     status.textContent = 'Submitting…';
-    fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`, { method: 'POST', body: new FormData(form), signal: controller.signal })
+    const body = new FormData(form);
+    const requestToken = new URLSearchParams(location.search).get('reviewloom_request');
+    if (requestToken) body.set('request_token', requestToken);
+    fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`, { method: 'POST', body, signal: controller.signal })
       .then((response) => response.json())
       .then((result) => { status.textContent = result.error || 'Thanks. Your review is waiting for approval.'; if (!result.error) form.reset(); })
       .catch((error) => { status.textContent = error.name === 'AbortError' ? 'This is taking longer than expected. Please try again in a moment.' : 'Something went wrong submitting your review. Please try again.'; })

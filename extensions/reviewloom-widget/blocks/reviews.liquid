@@ -1,5 +1,5 @@
 {% if product %}
-<section class="reviewloom-reviews reviewloom-reviews--{{ block.settings.layout }}" id="reviewloom-reviews" data-product-id="{{ product.id }}" data-layout="{{ block.settings.layout }}">
+<section class="reviewloom-reviews reviewloom-reviews--{{ block.settings.layout }}" id="reviewloom-reviews" data-product-id="{{ product.id }}" data-layout="{{ block.settings.layout }}" {{ block.shopify_attributes }}>
   {% if block.settings.layout == 'showcase' %}
     <div class="reviewloom-reviews__title-band"><h2>Ratings &amp; Reviews of {{ product.title }}</h2></div>
     <div class="reviewloom-reviews__summary-card">
@@ -44,12 +44,12 @@
       <h3>Share your experience</h3>
       <input name="product_name" type="hidden" value="{{ product.title | escape }}">
       <label>Rating <select name="rating" required data-reviewloom-rating-field><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></label>
-      <label>Your name <input name="reviewer" type="text" required></label>
+      <label>Your name <input name="reviewer" type="text" maxlength="100" autocomplete="name" required></label>
       <label>Email <input name="email" type="email"></label>
-      <label>Your review <textarea name="body" rows="4" required></textarea></label>
+      <label>Your review <textarea name="body" rows="4" maxlength="5000" required></textarea></label>
       <label>Photo URLs (optional, one per line) <textarea name="image_url_lines" rows="2" placeholder="https://example.com/photo1.jpg"></textarea></label>
       <div><button class="reviewloom-reviews__button" type="submit">Submit for review</button><button class="reviewloom-reviews__cancel" type="button" data-reviewloom-close>Cancel</button></div>
-      <p class="reviewloom-reviews__form-status" data-reviewloom-status></p>
+      <p class="reviewloom-reviews__form-status" data-reviewloom-status role="status" aria-live="polite"></p>
     </form>
   {% endif %}
 </section>
@@ -73,23 +73,24 @@
   const state = { sort: 'relevance', star: '', page: 1 };
 
   const votedKey = (id) => `reviewloom-voted-${id}`;
+  const storedVote = (id) => { try { return localStorage.getItem(votedKey(id)); } catch { return null; } };
   const renderVotes = (review) => {
-    const voted = window.localStorage ? window.localStorage.getItem(votedKey(review.id)) : null;
+    const voted = storedVote(review.id);
     return `<button type="button" class="reviewloom-reviews__helpful" data-review-id="${review.id}" ${voted ? 'disabled' : ''}>👍 Helpful (<span data-count>${review.helpfulCount || 0}</span>)</button>`;
   };
 
   const renderPhotos = (images) => images && images.length
-    ? `<div class="reviewloom-reviews__photos">${images.map((url) => `<img src="${escapeHtml(url)}" alt="" loading="lazy">`).join('')}</div>`
+    ? `<div class="reviewloom-reviews__photos">${images.filter((url) => /^https:\/\//i.test(url)).map((url, index) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(url)}" alt="Customer review photo ${index + 1}" width="96" height="96" loading="lazy" decoding="async"></a>`).join('')}</div>`
     : '';
 
   const renderList = (reviews) => {
     if (!reviews.length) return '<p class="reviewloom-reviews__empty">No reviews yet. Be the first to share your experience.</p>';
     if (!showcase) {
-      return reviews.map((review) => `<article><div>${stars(review.rating, outlineStars)} <strong>${escapeHtml(review.reviewer)}</strong></div><p>${escapeHtml(review.body)}</p></article>`).join('');
+      return reviews.map((review) => `<article><div>${stars(review.rating, outlineStars)} <strong>${escapeHtml(review.reviewer)}</strong> ${review.verifiedPurchase ? '<small>Verified purchase</small>' : ''}</div><p>${escapeHtml(review.body)}</p>${renderPhotos(review.images)}</article>`).join('');
     }
     return reviews.map((review) => `<article class="reviewloom-reviews__card">
       ${stars(review.rating, outlineStars)}
-      <div class="reviewloom-reviews__card-meta"><strong>${escapeHtml(review.reviewer)}</strong><time>${new Date(review.createdAt).toLocaleDateString()}</time></div>
+      <div class="reviewloom-reviews__card-meta"><strong>${escapeHtml(review.reviewer)}</strong>${review.verifiedPurchase ? '<small>Verified purchase</small>' : ''}<time>${new Date(review.createdAt).toLocaleDateString()}</time></div>
       <p>${escapeHtml(review.body)}</p>
       ${renderPhotos(review.images)}
       ${renderVotes(review)}
@@ -122,8 +123,8 @@
           .then((result) => {
             if (result.error) { button.disabled = false; return; }
             button.querySelector('[data-count]').textContent = result.helpfulCount;
-            if (window.localStorage) window.localStorage.setItem(votedKey(reviewId), '1');
-          });
+            try { localStorage.setItem(votedKey(reviewId), '1'); } catch { /* Storage may be disabled. */ }
+          }).catch(() => { button.disabled = false; });
       });
     });
   };
@@ -148,6 +149,12 @@
           if (openButton) openButton.hidden = true;
           if (form) form.hidden = true;
         }
+        const requestToken = new URLSearchParams(location.search).get('reviewloom_request');
+        if (settings.customerEligibility === 'verifiedBuyer' && !requestToken && openButton) {
+          openButton.disabled = true;
+          openButton.textContent = 'Use your purchase invitation to review';
+        }
+        if (requestToken && settings.reviewFormOn !== false && form) form.hidden = false;
         if (showcase) {
           summary.innerHTML = `<div class="reviewloom-reviews__score-number">${data.average}<span>/5</span></div>${stars(Math.round(data.average || 0), outlineStars)}<p>${data.count} Rating${data.count === 1 ? '' : 's'}</p>`;
           if (bars) bars.innerHTML = data.distribution.map((row) => `<div class="reviewloom-reviews__bar-row"><span>${stars(row.stars, outlineStars)}</span><span class="reviewloom-reviews__bar"><span style="width:${data.count ? (row.count / data.count) * 100 : 0}%"></span></span><span>${row.count}</span></div>`).join('');
@@ -168,7 +175,7 @@
   if (filterField) filterField.addEventListener('change', () => { state.star = filterField.value; state.page = 1; load(); });
 
   if (!form) return;
-  if (openButton) openButton.addEventListener('click', () => { form.hidden = false; form.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+  if (openButton) openButton.addEventListener('click', () => { form.hidden = false; form.scrollIntoView({ behavior: 'smooth', block: 'center' }); form.querySelector('select, input:not([type="hidden"])')?.focus({ preventScroll: true }); });
   root.querySelector('[data-reviewloom-close]').addEventListener('click', () => { form.hidden = true; });
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -179,6 +186,8 @@
     submitButton.disabled = true;
     status.textContent = 'Submitting…';
     const body = new FormData(form);
+    const requestToken = new URLSearchParams(location.search).get('reviewloom_request');
+    if (requestToken) body.set('request_token', requestToken);
     const imageLines = (body.get('image_url_lines') || '').split('\n').map((line) => line.trim()).filter(Boolean);
     body.delete('image_url_lines');
     imageLines.forEach((line) => body.append('image_url', line));

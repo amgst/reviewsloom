@@ -48,12 +48,32 @@ model Review {
   helpfulCount    Int           @default(0)
   notHelpfulCount Int           @default(0)
   discountCode    String?
+  verifiedPurchase Boolean      @default(false)
+  requestId       String?       @unique
+  source          String        @default("storefront")
+  importKey       String?       @unique
   deletedAt       DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   images          ReviewImage[]
+  events          ReviewEvent[]
+  votes           ReviewVote[]
 
   @@index([shop, productId, status])
+  @@index([shop, deletedAt, createdAt])
+  @@index([shop, status, createdAt])
+  @@index([shop, email])
+}
+
+model ReviewEvent {
+  id        String   @id @default(cuid())
+  shop      String
+  reviewId  String
+  review    Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  action    String
+  createdAt DateTime @default(now())
+
+  @@index([shop, reviewId, createdAt])
 }
 
 model ReviewImage {
@@ -81,6 +101,11 @@ model ReviewSettings {
   recycleBinOn         Boolean @default(false)
   reviewDiscountPercent String @default("none")
   onboardingCompletedAt DateTime?
+  widgetSeenAt          DateTime?
+  setupThemeConfirmedAt DateTime?
+  requestDelayDays      Int @default(7)
+  reminderDays          Int @default(7)
+  automaticRequestsOn   Boolean @default(false)
 }
 
 model ReviewRequest {
@@ -93,8 +118,53 @@ model ReviewRequest {
   emailId     String?
   error       String?
   sentAt      DateTime @default(now())
+  productId   String?
+  status      String   @default("QUEUED")
+  attempts    Int      @default(0)
+  scheduledAt DateTime @default(now())
+  deliveredAt DateTime?
+  bouncedAt   DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+  lockedAt    DateTime?
+  reminderSentAt DateTime?
+  orderVerified Boolean @default(false)
+  parentId    String?
+  deliveryPayload Json?
+  dedupeKey   String? @unique
+  createdAt   DateTime @default(now())
 
   @@index([shop, sentAt])
+  @@index([status, scheduledAt])
+  @@index([emailId])
+  @@index([shop, createdAt])
+  @@index([shop, orderId])
+  @@index([shop, email])
+}
+
+model StorefrontRateLimit {
+  key       String @id
+  count     Int @default(1)
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+
+model EmailSuppression {
+  id    String @id @default(cuid())
+  shop  String
+  email String
+  createdAt DateTime @default(now())
+  @@unique([shop, email])
+}
+
+model ReviewVote {
+  id       String @id @default(cuid())
+  reviewId String
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  voterKey String
+  createdAt DateTime @default(now())
+  @@unique([reviewId, voterKey])
+  @@index([createdAt])
 }
 
 model Question {
@@ -112,4 +182,5 @@ model Question {
   updatedAt   DateTime  @updatedAt
 
   @@index([shop, createdAt])
+  @@index([shop, email])
 }

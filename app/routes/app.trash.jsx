@@ -15,6 +15,7 @@ import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { purgeExpiredTrash } from "../reviews.server";
+import { moderateReviews } from "../review-workflow";
 
 const TRASH_RETENTION_DAYS = 30;
 
@@ -22,29 +23,36 @@ export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   // Purge and list run together (one round trip, not two): the list query
   // already excludes anything past retention, which is exactly what the purge removes.
-  const cutoff = new Date(Date.now() - TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  const cutoff = new Date(
+    Date.now() - TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+  );
   const [, reviews] = await Promise.all([
     purgeExpiredTrash(session.shop),
-    prisma.review.findMany({ where: { shop: session.shop, deletedAt: { gt: cutoff } }, orderBy: { deletedAt: "desc" } }),
+    prisma.review.findMany({
+      where: { shop: session.shop, deletedAt: { gt: cutoff } },
+      orderBy: { deletedAt: "desc" },
+      take: 100,
+    }),
   ]);
   return json({ reviews });
 };
 
 export const action = async ({ request }) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const formData = await request.formData();
   const id = formData.get("id");
 
-  if (formData.get("intent") === "restore") {
-    await prisma.review.update({ where: { id }, data: { deletedAt: null } });
-  } else if (formData.get("intent") === "delete-forever") {
-    await prisma.review.delete({ where: { id } });
-  }
-  return json({ ok: true });
+  const result = await moderateReviews(prisma, {
+    shop: session.shop,
+    ids: [id],
+    intent: formData.get("intent"),
+  });
+  return json(result, { status: result.code || 200 });
 };
 
 function daysLeft(deletedAt) {
-  const elapsed = (Date.now() - new Date(deletedAt).getTime()) / (24 * 60 * 60 * 1000);
+  const elapsed =
+    (Date.now() - new Date(deletedAt).getTime()) / (24 * 60 * 60 * 1000);
   return Math.max(0, Math.ceil(TRASH_RETENTION_DAYS - elapsed));
 }
 
@@ -55,11 +63,17 @@ export default function Trash() {
   return (
     <Page>
       <TitleBar title="Trash" />
+      <div role="status">{fetcher.data?.message || fetcher.data?.error}</div>
       <Card padding="0">
         <div className="reviewloom-section-heading">
           <div>
-            <Text as="h2" variant="headingLg">Deleted reviews</Text>
-            <Text as="p" tone="subdued">Reviews stay here for {TRASH_RETENTION_DAYS} days before being permanently removed.</Text>
+            <Text as="h2" variant="headingLg">
+              Deleted reviews
+            </Text>
+            <Text as="p" tone="subdued">
+              Reviews stay here for {TRASH_RETENTION_DAYS} days. Showing the 100
+              most recently deleted reviews; restore these to see older items.
+            </Text>
           </div>
         </div>
         <Divider />
@@ -69,25 +83,56 @@ export default function Trash() {
             items={reviews}
             renderItem={(review) => (
               <ResourceItem id={review.id}>
-                <InlineStack align="space-between" blockAlign="start" gap="400" wrap={false}>
+                <InlineStack
+                  align="space-between"
+                  blockAlign="start"
+                  gap="400"
+                  wrap={false}
+                >
                   <div>
                     <InlineStack gap="200">
-                      <Text as="h3" variant="headingMd">{review.productName}</Text>
+                      <Text as="h3" variant="headingMd">
+                        {review.productName}
+                      </Text>
                       <Badge>{`${daysLeft(review.deletedAt)} days left`}</Badge>
                     </InlineStack>
                     <Text as="p">&quot;{review.body}&quot;</Text>
-                    <Text as="p" tone="subdued">{review.reviewer} · {review.email}</Text>
+                    <Text as="p" tone="subdued">
+                      {review.reviewer} · {review.email}
+                    </Text>
                   </div>
                   <InlineStack gap="200">
                     <fetcher.Form method="post">
                       <input type="hidden" name="intent" value="restore" />
                       <input type="hidden" name="id" value={review.id} />
-                      <Button submit variant="primary">Restore</Button>
+                      <Button
+                        submit
+                        variant="primary"
+                        disabled={fetcher.state !== "idle"}
+                      >
+                        Restore
+                      </Button>
                     </fetcher.Form>
-                    <fetcher.Form method="post">
-                      <input type="hidden" name="intent" value="delete-forever" />
+                    <fetcher.Form
+                      method="post"
+                      onSubmit={(event) => {
+                        if (
+                          !window.confirm(
+                            "Permanently delete this review? This cannot be undone.",
+                          )
+                        )
+                          event.preventDefault();
+                      }}
+                    >
+                      <input
+                        type="hidden"
+                        name="intent"
+                        value="delete-forever"
+                      />
                       <input type="hidden" name="id" value={review.id} />
-                      <Button submit tone="critical">Delete forever</Button>
+                      <Button submit tone="critical">
+                        Delete forever
+                      </Button>
                     </fetcher.Form>
                   </InlineStack>
                 </InlineStack>
@@ -95,7 +140,11 @@ export default function Trash() {
             )}
           />
         ) : (
-          <div className="reviewloom-section-heading"><Text as="p" tone="subdued">Trash is empty.</Text></div>
+          <div className="reviewloom-section-heading">
+            <Text as="p" tone="subdued">
+              Trash is empty.
+            </Text>
+          </div>
         )}
       </Card>
     </Page>

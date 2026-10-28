@@ -18,11 +18,11 @@ function buildFromHeader(displayName) {
   const raw = process.env.RESEND_FROM_EMAIL || "Review Loom <onboarding@resend.dev>";
   const match = raw.match(/<([^>]+)>/);
   const address = match ? match[1] : raw.trim();
-  const safeName = (displayName || "Review Loom").replace(/["<>]/g, "").trim();
+  const safeName = (displayName || "Review Loom").replace(/["<>\r\n]/g, "").trim();
   return safeName ? `${safeName} <${address}>` : address;
 }
 
-export async function sendReviewRequestEmail({ id, to, productName, productUrl, senderName, replyTo }) {
+export async function sendReviewRequestEmail({ id, to, productName, productUrl, senderName, replyTo, unsubscribeUrl, reminder = false }) {
   const resend = getResendClient();
   if (!resend) return { error: { message: "RESEND_API_KEY is not configured." } };
 
@@ -30,9 +30,10 @@ export async function sendReviewRequestEmail({ id, to, productName, productUrl, 
   const from = senderName ? `${senderName} via Review Loom` : "Review Loom";
   const html = `
     <p>Hi,</p>
-    <p>Thanks for your recent purchase of <strong>${escapeHtml(productName)}</strong>! We'd love to hear what you thought.</p>
+    <p>We'd love your honest feedback about <strong>${escapeHtml(productName)}</strong>.</p>
     ${reviewLink ? `<p><a href="${escapeHtml(reviewLink)}">Leave a review</a></p>` : "<p>Reply to this email and let us know what you thought.</p>"}
     <p>Thanks for your support!</p>
+    ${unsubscribeUrl ? `<p style="font-size:12px"><a href="${escapeHtml(unsubscribeUrl)}">Stop review request emails from this store</a></p>` : ""}
   `.trim();
 
   return resend.emails.send(
@@ -40,7 +41,7 @@ export async function sendReviewRequestEmail({ id, to, productName, productUrl, 
       from: buildFromHeader(from),
       to: [to],
       replyTo: replyTo || undefined,
-      subject: `How was ${productName}?`,
+      subject: `${reminder ? "A quick reminder: " : ""}How was ${productName}?`,
       html,
     },
     { idempotencyKey: `review-request/${id}` },

@@ -6,8 +6,12 @@ function CollectCard({ title, description, action, url }) {
     <Layout.Section variant="oneThird">
       <Card>
         <BlockStack gap="300">
-          <Text as="h2" variant="headingMd">{title}</Text>
-          <Text as="p" tone="subdued">{description}</Text>
+          <Text as="h2" variant="headingMd">
+            {title}
+          </Text>
+          <Text as="p" tone="subdued">
+            {description}
+          </Text>
           <Button url={url}>{action}</Button>
         </BlockStack>
       </Card>
@@ -17,14 +21,19 @@ function CollectCard({ title, description, action, url }) {
 
 export default function CollectReviews() {
   return (
-    <Page>
+    <Page
+      title="Collect reviews"
+      subtitle="Turn real customer experiences into useful feedback."
+    >
       <TitleBar title="Collect reviews" />
       <BlockStack gap="500">
-        <Text as="p" tone="subdued">Proactively collect and motivate customers to leave reviews.</Text>
+        <Text as="p" tone="subdued">
+          Proactively collect and motivate customers to leave reviews.
+        </Text>
         <Layout>
           <CollectCard
             title="Review request"
-            description="Manually email a customer asking for a review of a recent order."
+            description="Queue customer invitations, track delivery and reviews, and manage retries or cancellations."
             action="Manage"
             url="/app/requests"
           />
@@ -36,7 +45,7 @@ export default function CollectReviews() {
           />
           <CollectCard
             title="Email notifications"
-            description="Customize the sender name and reply-to address used on review request emails."
+            description="Configure sender identity, fulfillment delays, reminders, and automatic collection when available."
             action="Setup"
             url="/app/settings"
           />

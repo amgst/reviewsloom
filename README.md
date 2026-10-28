@@ -1,3 +1,10 @@
+# ReviewLoom
+
+Production release steps, email delivery setup, automatic collection prerequisites,
+monitoring, recovery, and storefront QA are documented in [the operations guide](docs/OPERATIONS.md).
+Run `npm run check` before releasing. Builds do not apply database migrations;
+run `npm run migrate:deploy` explicitly against the intended environment.
+
 # Shopify App Template - Remix
 
 > [!NOTE]

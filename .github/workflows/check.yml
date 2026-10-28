@@ -1,0 +1,19 @@
+name: App checks
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+        env:
+          DATABASE_URL: postgresql://check:check@localhost:5432/reviewloom
+          DIRECT_URL: postgresql://check:check@localhost:5432/reviewloom
+          SHOPIFY_API_KEY: ci-placeholder
+          SHOPIFY_API_SECRET: ci-placeholder
+          SHOPIFY_APP_URL: https://example.com

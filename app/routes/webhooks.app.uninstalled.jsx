@@ -5,6 +5,14 @@ export const action = async ({ request }) => {
   const { shop, session, topic } = await authenticate.webhook(request);
 
   console.log(`Received ${topic} webhook for ${shop}`);
+  await db.reviewRequest.updateMany({
+    where: { shop, completedAt: null, cancelledAt: null },
+    data: { status: "CANCELLED", cancelledAt: new Date() },
+  });
+  await db.reviewSettings.updateMany({
+    where: { shop },
+    data: { automaticRequestsOn: false, requestEmailOn: false },
+  });
 
   // Webhook requests can trigger multiple times and after an app has already been uninstalled.
   // If this webhook already ran, the session may have been deleted previously.

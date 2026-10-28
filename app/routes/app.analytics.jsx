@@ -1,141 +1,230 @@
 import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
-import { BlockStack, Card, InlineStack, Layout, Page, Text } from "@shopify/polaris";
+import { useLoaderData, useSearchParams } from "@remix-run/react";
+import {
+  BlockStack,
+  Card,
+  DataTable,
+  InlineStack,
+  Page,
+  Select,
+  Text,
+} from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
-const CHART_DAYS = 14;
-
-function dayKey(date) {
-  return date.toISOString().slice(0, 10);
-}
-
-function buildDailyBuckets(reviews) {
-  const days = [];
-  for (let i = CHART_DAYS - 1; i >= 0; i -= 1) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    days.push({ key: dayKey(date), label: date.toLocaleDateString(undefined, { day: "numeric", month: "short" }), all: 0, approved: 0, disapproved: 0 });
-  }
-  const byKey = new Map(days.map((day) => [day.key, day]));
-  for (const review of reviews) {
-    const bucket = byKey.get(dayKey(new Date(review.createdAt)));
-    if (!bucket) continue;
-    bucket.all += 1;
-    if (review.status === "APPROVED") bucket.approved += 1;
-    if (review.status === "REJECTED") bucket.disapproved += 1;
-  }
-  return days;
-}
-
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-  const shop = session.shop;
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - CHART_DAYS);
-
-  const [totalReviews, approvedReviews, recentReviews, requests] = await Promise.all([
-    prisma.review.count({ where: { shop, deletedAt: null } }),
-    prisma.review.findMany({ where: { shop, deletedAt: null, status: "APPROVED" }, select: { rating: true } }),
-    prisma.review.findMany({ where: { shop, deletedAt: null, createdAt: { gte: cutoff } }, select: { status: true, createdAt: true } }),
-    prisma.reviewRequest.findMany({ where: { shop }, select: { emailId: true, error: true } }),
-  ]);
-
-  const approvedCount = approvedReviews.length;
-  const averageRating = approvedCount ? approvedReviews.reduce((sum, review) => sum + review.rating, 0) / approvedCount : 0;
-  const positiveCount = approvedReviews.filter((review) => review.rating >= 4).length;
-  const negativeCount = approvedReviews.filter((review) => review.rating <= 2).length;
-
-  const emailsSent = requests.filter((request) => request.emailId).length;
-  const emailsFailed = requests.filter((request) => request.error).length;
-
-  const daily = buildDailyBuckets(recentReviews);
-
+  const {
+    session: { shop },
+  } = await authenticate.admin(request);
+  const value = Number(new URL(request.url).searchParams.get("days"));
+  const days = [7, 30, 90].includes(value) ? value : 30;
+  const end = new Date();
+  end.setUTCHours(24, 0, 0, 0);
+  const start = new Date(end.getTime() - days * 86400000);
+  const previous = new Date(start.getTime() - days * 86400000);
+  const where = { shop, deletedAt: null, createdAt: { gte: start, lt: end } };
+  const [current, prior, approved, dailyRows, products, funnelRows] =
+    await Promise.all([
+      prisma.review.aggregate({ where, _count: true, _avg: { rating: true } }),
+      prisma.review.count({
+        where: {
+          shop,
+          deletedAt: null,
+          createdAt: { gte: previous, lt: start },
+        },
+      }),
+      prisma.review.count({ where: { ...where, status: "APPROVED" } }),
+      prisma.$queryRaw`SELECT to_char("createdAt", 'YYYY-MM-DD') AS day, COUNT(*)::int AS count FROM "Review" WHERE shop = ${shop} AND "deletedAt" IS NULL AND "createdAt" >= ${start} AND "createdAt" < ${end} GROUP BY day ORDER BY day`,
+      prisma.review.groupBy({
+        by: ["productId", "productName"],
+        where,
+        _count: true,
+        _avg: { rating: true },
+        orderBy: { _count: { productId: "desc" } },
+        take: 10,
+      }),
+      prisma.$queryRaw`SELECT COUNT(*)::int AS queued, COUNT(*) FILTER (WHERE r."emailId" IS NOT NULL)::int AS sent, COUNT(*) FILTER (WHERE r."deliveredAt" IS NOT NULL)::int AS delivered, COUNT(*) FILTER (WHERE r."bouncedAt" IS NOT NULL)::int AS bounced, COUNT(*) FILTER (WHERE r."completedAt" IS NOT NULL)::int AS completed, COUNT(*) FILTER (WHERE v.status = 'APPROVED' AND v."deletedAt" IS NULL)::int AS published FROM "ReviewRequest" r LEFT JOIN "Review" v ON v."requestId" = r.id AND v.shop = r.shop WHERE r.shop = ${shop} AND r."parentId" IS NULL AND r."createdAt" >= ${start} AND r."createdAt" < ${end}`,
+    ]);
+  const daily = Array.from({ length: days }, (_, index) => {
+    const day = new Date(start.getTime() + index * 86400000)
+      .toISOString()
+      .slice(0, 10);
+    return { day, count: dailyRows.find((r) => r.day === day)?.count || 0 };
+  });
   return json({
-    totalReviews,
-    approvedCount,
-    averageRating: Number(averageRating.toFixed(1)),
-    positiveCount,
-    negativeCount,
-    emailsSent,
-    emailsFailed,
+    days,
+    current: current._count,
+    average: current._avg.rating,
+    prior,
+    approved,
     daily,
+    products: products.map((p) => ({
+      name: p.productName,
+      count: p._count,
+      average: p._avg.rating,
+    })),
+    funnel: funnelRows[0],
   });
 };
 
-function StatCard({ title, value, rows }) {
-  return (
-    <Card>
-      <BlockStack gap="200">
-        <Text as="h2" variant="headingMd">{title}</Text>
-        <Text as="p" variant="heading2xl">{value}</Text>
-        <BlockStack gap="100">
-          {rows.map((row) => (
-            <InlineStack key={row.label} align="space-between">
-              <Text as="span" tone="subdued">{row.label}</Text>
-              <Text as="span">{row.value}</Text>
-            </InlineStack>
-          ))}
-        </BlockStack>
-      </BlockStack>
-    </Card>
-  );
-}
-
-function ReviewsChart({ daily }) {
-  const max = Math.max(1, ...daily.map((day) => day.all));
-  const chartHeight = 160;
-  const barGroupWidth = 100 / daily.length;
-
-  return (
-    <Card>
-      <BlockStack gap="400">
-        <Text as="h2" variant="headingLg">Reviews over the last {CHART_DAYS} days</Text>
-        <svg viewBox={`0 0 100 ${chartHeight + 24}`} preserveAspectRatio="none" style={{ width: "100%", height: 220 }} role="img" aria-label="Reviews over time">
-          {daily.map((day, index) => {
-            const x = index * barGroupWidth;
-            const allHeight = (day.all / max) * chartHeight;
-            const approvedHeight = (day.approved / max) * chartHeight;
-            const disapprovedHeight = (day.disapproved / max) * chartHeight;
-            return (
-              <g key={day.key} transform={`translate(${x}, 0)`}>
-                <rect x={barGroupWidth * 0.15} y={chartHeight - allHeight} width={barGroupWidth * 0.7} height={allHeight} fill="#e3d9cb" />
-                <rect x={barGroupWidth * 0.15} y={chartHeight - approvedHeight} width={barGroupWidth * 0.32} height={approvedHeight} fill="#2e7d32" />
-                <rect x={barGroupWidth * 0.53} y={chartHeight - disapprovedHeight} width={barGroupWidth * 0.32} height={disapprovedHeight} fill="#c0392b" />
-              </g>
-            );
-          })}
-        </svg>
-        <InlineStack gap="400">
-          <InlineStack gap="100" blockAlign="center"><span style={{ width: 10, height: 10, background: "#e3d9cb", display: "inline-block" }} /><Text as="span" tone="subdued">All reviews</Text></InlineStack>
-          <InlineStack gap="100" blockAlign="center"><span style={{ width: 10, height: 10, background: "#2e7d32", display: "inline-block" }} /><Text as="span" tone="subdued">Approved reviews</Text></InlineStack>
-          <InlineStack gap="100" blockAlign="center"><span style={{ width: 10, height: 10, background: "#c0392b", display: "inline-block" }} /><Text as="span" tone="subdued">Disapproved reviews</Text></InlineStack>
-        </InlineStack>
-      </BlockStack>
-    </Card>
-  );
-}
-
 export default function Analytics() {
-  const { totalReviews, approvedCount, averageRating, positiveCount, negativeCount, emailsSent, emailsFailed, daily } = useLoaderData();
-
+  const { days, current, average, prior, approved, daily, products, funnel } =
+    useLoaderData();
+  const [, setParams] = useSearchParams();
+  const change = prior
+    ? `${Math.round(((current - prior) / prior) * 100)}% versus previous ${days} days`
+    : "No reviews in the previous period";
+  const max = Math.max(1, ...daily.map((d) => d.count));
   return (
-    <Page>
+    <Page
+      title="Analytics"
+      subtitle="Understand your review collection and customer feedback."
+    >
       <TitleBar title="Analytics" />
       <BlockStack gap="500">
-        <Layout>
-          <Layout.Section variant="oneThird">
-            <StatCard title="Approved reviews" value={approvedCount} rows={[{ label: "Total reviews", value: totalReviews }, { label: "Approved reviews", value: approvedCount }]} />
-          </Layout.Section>
-          <Layout.Section variant="oneThird">
-            <StatCard title="Average rating" value={averageRating || "--"} rows={[{ label: "Positive reviews", value: positiveCount }, { label: "Negative reviews", value: negativeCount }]} />
-          </Layout.Section>
-          <Layout.Section variant="oneThird">
-            <StatCard title="Email sent" value={emailsSent} rows={[{ label: "Sent", value: emailsSent }, { label: "Failed", value: emailsFailed }]} />
-          </Layout.Section>
-        </Layout>
-        <ReviewsChart daily={daily} />
+        <InlineStack align="end">
+          <Select
+            label="Reporting period (UTC)"
+            value={String(days)}
+            options={[7, 30, 90].map((n) => ({
+              label: `Last ${n} days`,
+              value: String(n),
+            }))}
+            onChange={(value) => setParams({ days: value })}
+          />
+        </InlineStack>
+        <div className="reviewloom-metrics">
+          {[
+            ["Reviews received", current, change],
+            [
+              "Average rating",
+              average ? average.toFixed(1) : "—",
+              "All received ratings, including pending feedback",
+            ],
+            ["Published", approved, "From reviews received in this period"],
+          ].map(([title, value, caption]) => (
+            <Card key={title}>
+              <BlockStack gap="200">
+                <Text as="h2" variant="headingSm">
+                  {title}
+                </Text>
+                <Text as="p" variant="heading2xl">
+                  {value}
+                </Text>
+                <Text as="p" tone="subdued">
+                  {caption}
+                </Text>
+              </BlockStack>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <BlockStack gap="400">
+            <Text as="h2" variant="headingLg">
+              Review request funnel
+            </Text>
+            <Text as="p" tone="subdued">
+              Original requests created in this period. Delivery and review
+              outcomes update as customers respond. Reminders are excluded.
+            </Text>
+            <div className="reviewloom-funnel">
+              {[
+                ["Queued", funnel.queued],
+                ["Sent", funnel.sent],
+                ["Delivered", funnel.delivered],
+                ["Review received", funnel.completed],
+                ["Published", funnel.published],
+              ].map(([title, value]) => (
+                <div key={title}>
+                  <Text as="p" variant="headingXl">
+                    {value}
+                  </Text>
+                  <Text as="h3" variant="headingSm">
+                    {title}
+                  </Text>
+                </div>
+              ))}
+            </div>
+            <InlineStack gap="500">
+              <Text as="p">
+                Request completion:{" "}
+                {funnel.sent
+                  ? `${((funnel.completed / funnel.sent) * 100).toFixed(1)}%`
+                  : "—"}
+              </Text>
+              <Text as="p">Bounces: {funnel.bounced}</Text>
+            </InlineStack>
+            <Text as="p" tone="subdued">
+              Delivered counts require email provider webhook configuration.
+              Revenue attribution is not tracked.
+            </Text>
+          </BlockStack>
+        </Card>
+        <Card>
+          <BlockStack gap="400">
+            <Text as="h2" variant="headingLg">
+              Reviews over time
+            </Text>
+            {current ? (
+              <div
+                className="reviewloom-bar-chart"
+                role="img"
+                aria-label={`${current} reviews received over ${days} days. Daily values are available in the table below.`}
+              >
+                {daily.map((d) => (
+                  <div
+                    key={d.day}
+                    title={`${d.day}: ${d.count}`}
+                    style={{ height: `${Math.max(2, (d.count / max) * 100)}%` }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <Text as="p" tone="subdued">
+                No reviews received during this period.
+              </Text>
+            )}
+            <InlineStack align="space-between">
+              <Text as="p" tone="subdued">
+                {daily[0].day}
+              </Text>
+              <Text as="p" tone="subdued">
+                {daily[daily.length - 1].day}
+              </Text>
+            </InlineStack>
+            <details>
+              <summary>View daily numbers</summary>
+              <DataTable
+                columnContentTypes={["text", "numeric"]}
+                headings={["Date (UTC)", "Reviews"]}
+                rows={daily.map((d) => [d.day, d.count])}
+              />
+            </details>
+          </BlockStack>
+        </Card>
+        <Card>
+          <BlockStack gap="300">
+            <Text as="h2" variant="headingLg">
+              Top products by review volume
+            </Text>
+            {products.length ? (
+              <DataTable
+                columnContentTypes={["text", "numeric", "numeric"]}
+                headings={["Product", "Reviews", "Average rating"]}
+                rows={products.map((p) => [
+                  p.name,
+                  p.count,
+                  p.average?.toFixed(1) || "—",
+                ])}
+              />
+            ) : (
+              <Text as="p" tone="subdued">
+                Product insights will appear when reviews arrive.
+              </Text>
+            )}
+          </BlockStack>
+        </Card>
       </BlockStack>
     </Page>
   );

@@ -8,6 +8,11 @@ import prisma from "../db.server";
 export const action = async ({ request }) => {
   const { shop, topic, payload } = await authenticate.webhook(request);
   console.log(`Received ${topic} webhook for ${shop}`);
+  const customerEmail = payload.customer?.email;
+  const customerWhere = {
+    shop,
+    email: { equals: customerEmail, mode: "insensitive" },
+  };
 
   if (topic === "CUSTOMERS_DATA_REQUEST") {
     // We don't auto-email an export - the store owner fulfills the request
@@ -16,11 +21,19 @@ export const action = async ({ request }) => {
     const email = payload.customer?.email;
     if (email) {
       const [reviews, questions, reviewRequests] = await Promise.all([
-        prisma.review.findMany({ where: { shop, email } }),
-        prisma.question.findMany({ where: { shop, email } }),
-        prisma.reviewRequest.findMany({ where: { shop, email } }),
+        prisma.review.count({ where: customerWhere }),
+        prisma.question.count({ where: customerWhere }),
+        prisma.reviewRequest.count({ where: customerWhere }),
       ]);
-      console.log(`[gdpr] data_request for ${email} at ${shop}: ${reviews.length} review(s), ${questions.length} question(s), ${reviewRequests.length} review request(s)`);
+      console.log(
+        JSON.stringify({
+          event: "privacy.data_request",
+          shop,
+          reviews,
+          questions,
+          requests: reviewRequests,
+        }),
+      );
     }
   }
 
@@ -30,23 +43,33 @@ export const action = async ({ request }) => {
     const email = payload.customer?.email;
     if (email) {
       const [reviews, questions, reviewRequests] = await Promise.all([
-        prisma.review.deleteMany({ where: { shop, email } }),
-        prisma.question.deleteMany({ where: { shop, email } }),
-        prisma.reviewRequest.deleteMany({ where: { shop, email } }),
+        prisma.review.deleteMany({ where: customerWhere }),
+        prisma.question.deleteMany({ where: customerWhere }),
+        prisma.reviewRequest.deleteMany({ where: customerWhere }),
       ]);
-      console.log(`[gdpr] redacted ${email} at ${shop}: ${reviews.count} review(s), ${questions.count} question(s), ${reviewRequests.count} review request(s)`);
+      await prisma.emailSuppression.deleteMany({ where: customerWhere });
+      console.log(
+        JSON.stringify({
+          event: "privacy.redacted",
+          shop,
+          reviews: reviews.count,
+          questions: questions.count,
+          requests: reviewRequests.count,
+        }),
+      );
     }
   }
 
   if (topic === "SHOP_REDACT") {
     // Sent ~48 days after uninstall. Erase everything we hold for this shop.
-    const shopDomain = payload.shop_domain || shop;
+    const shopDomain = shop;
     await Promise.all([
       prisma.review.deleteMany({ where: { shop: shopDomain } }),
       prisma.question.deleteMany({ where: { shop: shopDomain } }),
       prisma.reviewRequest.deleteMany({ where: { shop: shopDomain } }),
       prisma.reviewSettings.deleteMany({ where: { shop: shopDomain } }),
       prisma.session.deleteMany({ where: { shop: shopDomain } }),
+      prisma.emailSuppression.deleteMany({ where: { shop: shopDomain } }),
     ]);
     console.log(`[gdpr] fully redacted shop ${shopDomain}`);
   }
