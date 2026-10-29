@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createHash } from "node:crypto";
 import { parseCsv } from "../csv";
 import { json } from "@remix-run/node";
@@ -73,6 +73,52 @@ export default function Import() {
   const submit = useSubmit();
   const navigation = useNavigation();
   const [csv, setCsv] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [fileError, setFileError] = useState("");
+  const [reading, setReading] = useState(false);
+  const [previewText, setPreviewText] = useState(null);
+  const fileRead = useRef(0);
+  const busy = reading || navigation.state !== "idle";
+  const changeCsv = (text) => {
+    fileRead.current++;
+    setReading(false);
+    setCsv(text);
+    setFileName("");
+    setFileError("");
+    setPreviewText(null);
+  };
+  const chooseFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const currentRead = ++fileRead.current;
+    setCsv("");
+    setPreviewText(null);
+    setFileName("");
+    setFileError("");
+    if (!/\.csv$/i.test(file.name) || file.size > 2_000_000) {
+      setReading(false);
+      setFileError("Choose a .csv file smaller than 2 MB.");
+      return;
+    }
+    setReading(true);
+    try {
+      const text = await file.text();
+      if (currentRead !== fileRead.current) return;
+      const { rows, errors } = parseCsv(text);
+      if (errors.length || !rows.length) {
+        setFileError(errors[0] || "Include at least one review row.");
+        return;
+      }
+      setCsv(text);
+      setFileName(file.name);
+    } catch {
+      if (currentRead === fileRead.current)
+        setFileError("This file could not be read. Choose it again.");
+    } finally {
+      if (currentRead === fileRead.current) setReading(false);
+    }
+  };
 
   return (
     <Page>
@@ -96,7 +142,7 @@ export default function Import() {
               </BlockStack>
             </Card>
             <Card>
-              <Form method="post">
+              <Form method="post" onSubmit={() => setPreviewText(csv)}>
                 <BlockStack gap="400">
                   <Text as="h2" variant="headingLg">
                     Import reviews from a CSV
@@ -107,7 +153,8 @@ export default function Import() {
                     skipped.
                   </Text>
                   <Text as="p" tone="subdued">
-                    Paste CSV rows with a header row using these columns:
+                    Upload a CSV file up to 2 MB with a header row using these
+                    columns:
                   </Text>
                   <List type="bullet">
                     <List.Item>
@@ -119,25 +166,50 @@ export default function Import() {
                       <code>image_url</code> — optional
                     </List.Item>
                   </List>
-                  <TextField
-                    label="CSV data"
-                    labelHidden
-                    name="csv"
-                    value={csv}
-                    onChange={setCsv}
-                    multiline={8}
-                    autoComplete="off"
-                    placeholder={
-                      "product_id,product_name,reviewer,rating,body,image_url\n7920123,Canvas weekend tote,Jon Bell,5,Great quality and fast shipping.,"
-                    }
-                  />
-                  <Button
-                    submit
-                    disabled={!csv.trim() || navigation.state !== "idle"}
-                  >
+                  <BlockStack gap="200">
+                    <label htmlFor="reviewloom-csv-file">
+                      Choose a CSV file
+                    </label>
+                    <input
+                      id="reviewloom-csv-file"
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={chooseFile}
+                      disabled={navigation.state !== "idle"}
+                      aria-describedby="reviewloom-csv-status"
+                    />
+                    <div
+                      id="reviewloom-csv-status"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {reading
+                        ? "Reading CSV…"
+                        : fileError ||
+                          (fileName
+                            ? `Selected: ${fileName}`
+                            : "Choose a file, then preview your reviews before importing.")}
+                    </div>
+                  </BlockStack>
+                  <details>
+                    <summary>Or paste CSV data</summary>
+                    <TextField
+                      label="CSV data"
+                      value={csv}
+                      onChange={changeCsv}
+                      disabled={navigation.state !== "idle"}
+                      multiline={8}
+                      autoComplete="off"
+                      placeholder={
+                        "product_id,product_name,reviewer,rating,body,image_url\n7920123,Canvas weekend tote,Jon Bell,5,Great quality and fast shipping.,"
+                      }
+                    />
+                  </details>
+                  <input type="hidden" name="csv" value={csv} />
+                  <Button submit disabled={!csv.trim() || busy}>
                     Preview import
                   </Button>
-                  {actionData?.preview ? (
+                  {actionData?.preview && previewText === csv && !busy ? (
                     <BlockStack gap="200">
                       <Text as="h3" variant="headingMd">
                         Preview: {actionData.total} review(s)

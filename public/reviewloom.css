@@ -1,4 +1,18 @@
 :root { --reviewloom-ink: #17221d; --reviewloom-coral: #d95d39; --reviewloom-sand: #f5f0e8; --reviewloom-moss: #65735b; }
+.reviewloom-wizard-steps { display: grid; gap: 8px; }
+.reviewloom-wizard-step { border: 1px solid #e3e5e4; border-radius: 10px; overflow: hidden; }
+.reviewloom-wizard-step--active { border-color: #b5c8be; background: #f8faf9; }
+.reviewloom-wizard-heading { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; padding: 16px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.reviewloom-wizard-heading:hover { background: #f1f4f2; }
+.reviewloom-wizard-heading:focus-visible { outline: 2px solid #005bd3; outline-offset: -3px; }
+.reviewloom-wizard-number { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 28px; border: 1px solid #c9cfcb; border-radius: 50%; background: white; font-weight: 600; }
+.reviewloom-wizard-number--done { background: #dcf5e6; border-color: #a8d9bb; color: #146c3b; }
+.reviewloom-wizard-title { flex: 1; min-width: 0; font-weight: 600; }
+.reviewloom-wizard-heading .Polaris-Badge { white-space: nowrap; }
+.reviewloom-wizard-toggle { color: #616b65; font-size: 18px; }
+.reviewloom-wizard-content { padding: 0 16px 20px 56px; }
+.reviewloom-wizard-instructions { margin: 0; padding-left: 20px; line-height: 1.7; }
+@media (max-width: 600px) { .reviewloom-wizard-heading { flex-wrap: wrap; gap: 8px; } .reviewloom-wizard-title { flex-basis: calc(100% - 60px); } .reviewloom-wizard-heading .Polaris-Badge { margin-left: 36px; } .reviewloom-wizard-toggle { margin-left: auto; } .reviewloom-wizard-content { padding: 0 16px 20px; } }
 .reviewloom-shell { max-width: 1180px; margin: 0 auto; padding: 28px 0 56px; }
 .reviewloom-intro { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
 .reviewloom-intro h1 { color: var(--reviewloom-ink); letter-spacing: -0.02em; margin-top: 4px; }

@@ -1,25 +1,60 @@
 import { BlockStack, Button, InlineStack, Text } from "@shopify/polaris";
 
-export function ThemeSetupGuide({ shop, apiKey, detailed = false }) {
+export function ThemeSetupGuide({
+  shop,
+  apiKey,
+  detailed = false,
+  compact = false,
+}) {
   const editor = new URL(`https://${shop}/admin/themes/current/editor`);
   editor.searchParams.set("template", "product");
   if (apiKey) {
     editor.searchParams.set("addAppBlockId", `${apiKey}/reviews`);
     editor.searchParams.set("target", "newAppsSection");
   }
+  if (compact)
+    return (
+      <BlockStack gap="300">
+        <ol className="reviewloom-wizard-instructions">
+          <li>Open your theme and add the All product reviews block.</li>
+          <li>Place it below your product details and click Save.</li>
+          <li>Return here and confirm that your theme is saved.</li>
+        </ol>
+        <InlineStack gap="300" blockAlign="center">
+          <Button url={editor.toString()} target="_blank" variant="primary">
+            Add reviews to theme
+          </Button>
+          <Button url="/app/settings" variant="plain">
+            Customize appearance
+          </Button>
+          <Button url="/app/help" variant="plain">
+            View setup guide
+          </Button>
+        </InlineStack>
+        <Text as="p" tone="subdued">
+          Already added the widget? Confirm below. Use your theme editor to edit
+          the existing block.
+        </Text>
+      </BlockStack>
+    );
   return (
     <BlockStack gap="300">
       <Text as="p">
         Add customer reviews to your product pages without editing code.
       </Text>
       <ol>
-        <li>Click Add reviews to theme to open your current theme in a new tab.</li>
+        <li>
+          Click Add reviews to theme to open your current theme in a new tab.
+        </li>
         <li>
           In Products → Default product, check the All product reviews block.
           Drag its section below your product details.
         </li>
         <li>Click Save in the theme editor.</li>
-        <li>Open a product in your online store and check it on desktop and mobile.</li>
+        <li>
+          Open a product in your online store and check it on desktop and
+          mobile.
+        </li>
       </ol>
       <InlineStack gap="200">
         <Button url={editor.toString()} target="_blank" variant="primary">
@@ -36,18 +71,23 @@ export function ThemeSetupGuide({ shop, apiKey, detailed = false }) {
       </Text>
       {detailed ? (
         <BlockStack gap="300">
-          <Text as="h3" variant="headingMd">If the block does not appear</Text>
+          <Text as="h3" variant="headingMd">
+            If the block does not appear
+          </Text>
           <Text as="p">
             In the product template, click Add section → Apps → All product
             reviews under ReviewLoom. You can also use Add block → Apps inside a
             section that supports app blocks. Position it and click Save.
           </Text>
-          <Text as="h3" variant="headingMd">Alternative: enable the app embed</Text>
+          <Text as="h3" variant="headingMd">
+            Alternative: enable the app embed
+          </Text>
           <Text as="p">
             For a theme without app block support, open App embeds in the theme
-            editor, turn on Reviewloom auto-embed, and click Save. Reviews appear
-            at the end of product pages by default. Use either this embed or the
-            All product reviews block on a product page to avoid duplicate widgets.
+            editor, turn on Reviewloom auto-embed, and click Save. Reviews
+            appear at the end of product pages by default. Use either this embed
+            or the All product reviews block on a product page to avoid
+            duplicate widgets.
           </Text>
           <Button
             url={`https://${shop}/admin/themes/current/editor?context=apps&template=product`}
@@ -55,14 +95,18 @@ export function ThemeSetupGuide({ shop, apiKey, detailed = false }) {
           >
             Open app embeds
           </Button>
-          <Text as="h3" variant="headingMd">Add more storefront features</Text>
+          <Text as="h3" variant="headingMd">
+            Add more storefront features
+          </Text>
           <Text as="p">
             Use Add block → Apps → Product rating badge near the product title,
             or add Questions &amp; answers below the details. Add the Review
             carousel to your home page from Add section → Apps. Save after each
             change.
           </Text>
-          <Text as="h3" variant="headingMd">Check your setup</Text>
+          <Text as="h3" variant="headingMd">
+            Check your setup
+          </Text>
           <Text as="p">
             Confirm the product uses the template you edited and you saved the
             correct theme. An empty widget is normal until you publish a review

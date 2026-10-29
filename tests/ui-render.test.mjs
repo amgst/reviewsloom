@@ -73,13 +73,25 @@ const fixtures = {
     },
   },
 };
+fixtures.reviewsConnected = {
+  ...fixtures.reviews,
+  settings: { ...settings, widgetSeenAt: "2026-10-29T08:00:00Z" },
+};
+fixtures.reviewsComplete = {
+  ...fixtures.reviews,
+  settings: {
+    ...settings,
+    widgetSeenAt: "2026-10-29T08:00:00Z",
+    setupThemeConfirmedAt: "2026-10-29T08:00:00Z",
+  },
+};
 for (const [name, fixture] of Object.entries(fixtures)) {
   test(`${name} page renders with realistic data`, async () => {
     globalThis.__reviewloomPreviewData = fixture;
     const outfile = path.resolve(`.cache/previews/${name}.mjs`);
     await build({
       entryPoints: [
-        `app/routes/app.${name === "reviews" ? "_index" : name}.jsx`,
+        `app/routes/app.${name.startsWith("reviews") ? "_index" : name}.jsx`,
       ],
       outfile,
       bundle: true,
@@ -124,6 +136,21 @@ for (const [name, fixture] of Object.entries(fixtures)) {
     );
     assert.ok(markup.includes("Polaris-Page"));
     assert.ok(!markup.includes("NaN"));
+    if (name.startsWith("reviews")) {
+      assert.equal(
+        (markup.match(/aria-expanded="true"/g) || []).length,
+        name === "reviewsComplete" ? 0 : 1,
+      );
+      assert.ok(!markup.includes("signed storefront widget request"));
+    }
+    if (name === "reviewsConnected") {
+      assert.ok(markup.includes("2 of 3 complete"));
+      assert.ok(markup.includes("Widget connected"));
+    }
+    if (name === "reviewsComplete") {
+      assert.ok(markup.includes("3 of 3 complete"));
+      assert.ok(markup.includes("Finish setup"));
+    }
     const css = await readFile(
       "node_modules/@shopify/polaris/build/esm/styles.css",
       "utf8",
