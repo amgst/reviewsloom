@@ -34,7 +34,7 @@ export function OnboardingWizard({ settings, shop, apiKey, reviewCount }) {
           <Badge>{`${completed} of 3 complete`}</Badge>
         </InlineStack>
         <ProgressBar progress={(completed / 3) * 100} size="small" />
-        <div className="reviewloom-setup-step">
+        <div className="reviewloom-setup-step reviewloom-setup-step--theme">
           <div>
             <Text as="h3" variant="headingMd">
               1. Customize and add your widget
