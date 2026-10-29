@@ -30,7 +30,7 @@ const fail = (error) => {
 
 export const loader = async ({ request }) => {
   try {
-    const { shop, settings, customerId } = await storefrontContext(request);
+    const { shop, settings } = await storefrontContext(request);
     const url = new URL(request.url);
     const productId = url.searchParams.get("product_id");
     if (productId && productId.length > 100)
@@ -117,11 +117,7 @@ export const loader = async ({ request }) => {
           accentColor: settings.accentColor,
           starStyle: settings.starStyle,
           alignment: settings.alignment,
-          reviewFormOn:
-            settings.reviewFormOn &&
-            (settings.customerEligibility !== "loggedIn" ||
-              Boolean(customerId)),
-          customerEligibility: settings.customerEligibility,
+          reviewFormOn: settings.reviewFormOn,
         },
       },
       { headers: { "Cache-Control": "private, no-store" } },
@@ -133,7 +129,7 @@ export const loader = async ({ request }) => {
 
 export const action = async ({ request }) => {
   try {
-    const { shop, settings, customerId } = await storefrontContext(request);
+    const { shop, settings } = await storefrontContext(request);
     const url = new URL(request.url);
     const data = await request.formData();
     const productId = url.searchParams.get("product_id");
@@ -184,11 +180,6 @@ export const action = async ({ request }) => {
     await limitStorefront(request, shop, "review");
     if (!settings.reviewFormOn)
       return json({ error: "Review collection is paused." }, { status: 403 });
-    if (settings.customerEligibility === "loggedIn" && !customerId)
-      return json(
-        { error: "Please log in to leave a review." },
-        { status: 403 },
-      );
     const rating = Number(data.get("rating"));
     if (!Number.isInteger(rating) || rating < 1 || rating > 5)
       return json({ error: "Choose a rating from 1 to 5." }, { status: 400 });

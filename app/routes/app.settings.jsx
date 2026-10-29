@@ -73,9 +73,6 @@ export default function Settings() {
   const [starStyle, setStarStyle] = useState(settings.starStyle);
   const [alignment, setAlignment] = useState(settings.alignment);
   const [reviewFormOn, setReviewFormOn] = useState(settings.reviewFormOn);
-  const [customerEligibility, setCustomerEligibility] = useState(
-    settings.customerEligibility || "everyone",
-  );
   const [autoPublishThreshold, setAutoPublishThreshold] = useState(
     settings.autoPublishThreshold || "disabled",
   );
@@ -190,34 +187,6 @@ export default function Settings() {
                       onChange={setAlignment}
                       helpText="Where the widget sits on the product page."
                     />
-                  </BlockStack>
-                </Card>
-                <Card>
-                  <BlockStack gap="400">
-                    <Text as="h2" variant="headingLg">
-                      Customer eligibility
-                    </Text>
-                    <input
-                      type="hidden"
-                      name="customerEligibility"
-                      value={customerEligibility}
-                    />
-                    <BlockStack gap="200">
-                      <RadioButton
-                        label="Only customers logged in can write reviews"
-                        checked={customerEligibility === "loggedIn"}
-                        id="customerEligibility-loggedIn"
-                        name="customerEligibility-display"
-                        onChange={() => setCustomerEligibility("loggedIn")}
-                      />
-                      <RadioButton
-                        label="Everyone can write reviews"
-                        checked={customerEligibility === "everyone"}
-                        id="customerEligibility-everyone"
-                        name="customerEligibility-display"
-                        onChange={() => setCustomerEligibility("everyone")}
-                      />
-                    </BlockStack>
                   </BlockStack>
                 </Card>
                 <Card>

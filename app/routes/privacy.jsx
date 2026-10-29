@@ -70,10 +70,10 @@ export default function Privacy() {
         addresses in their operational logs.
       </p>
       <p>
-        We process the logged-in customer identifier forwarded by Shopify to
-        check whether a visitor may submit a review when the merchant limits
-        reviews to logged-in customers. The review widget also uses browser
-        local storage to remember votes on that device.
+        Customers can submit reviews and questions without logging in. The App
+        does not use Shopify customer identifiers to determine who can submit.
+        The review widget uses browser local storage to remember votes on that
+        device.
       </p>
       <p>
         We do not collect payment information, and we do not use tracking
@@ -86,10 +86,7 @@ export default function Privacy() {
           To store, moderate and display reviews and questions on the merchant's
           store.
         </li>
-        <li>
-          To limit abusive submissions, prevent duplicate votes and apply the
-          merchant's review submission eligibility settings.
-        </li>
+        <li>To limit abusive submissions and prevent duplicate votes.</li>
         <li>
           To create discount codes for reviewers when the merchant enables this
           feature.

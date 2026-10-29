@@ -19,7 +19,6 @@ export async function storefrontContext(request) {
   return {
     shop,
     settings,
-    customerId: url.searchParams.get("logged_in_customer_id") || null,
   };
 }
 

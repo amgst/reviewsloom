@@ -29,14 +29,16 @@ test("exports escape spreadsheet formulas and round-trip customer text", () => {
     body,
   );
 });
-test("settings reject removed eligibility and ignore retired email controls", () => {
+test("settings normalize removed eligibility and ignore retired email controls", () => {
   const data = new FormData();
   data.set("automaticRequestsOn", "true");
   data.set("requestEmailOn", "true");
   assert.equal("automaticRequestsOn" in settingsInput(data), false);
   assert.equal("requestEmailOn" in settingsInput(data), false);
   data.set("customerEligibility", "verifiedBuyer");
-  assert.throws(() => settingsInput(data));
+  assert.equal(settingsInput(data).customerEligibility, "everyone");
+  data.set("customerEligibility", "loggedIn");
+  assert.equal(settingsInput(data).customerEligibility, "everyone");
   data.set("customerEligibility", "everyone");
   data.set("accentColor", "red; background:url(x)");
   assert.throws(() => settingsInput(data));

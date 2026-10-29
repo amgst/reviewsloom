@@ -13,11 +13,8 @@ export function settingsInput(data) {
     accentColor,
     starStyle: valid("starStyle", ["solid", "outline"], "solid"),
     alignment: valid("alignment", ["left", "center"], "center"),
-    customerEligibility: valid(
-      "customerEligibility",
-      ["everyone", "loggedIn"],
-      "everyone",
-    ),
+    // Normalize legacy settings; storefront collection never depends on login.
+    customerEligibility: "everyone",
     autoPublishThreshold: valid(
       "autoPublishThreshold",
       ["disabled", "5stars", "4plus", "all"],

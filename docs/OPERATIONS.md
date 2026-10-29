@@ -39,6 +39,12 @@ review and remove that content separately. This release does not scan historical
 
 ## Privacy requests
 
+Storefront reviews no longer require customer login. Legacy `customerEligibility`
+values are ignored by submission/display routes and normalized to `everyone` when
+settings are saved. No new database migration is needed for this change. Shopify's
+signed proxy requests may still contain a customer identifier, but application
+collection code does not read, return or save it. Preserve proxy signature verification.
+
 Mandatory Shopify compliance webhooks remain authenticated and subscribed. Shop redaction
 deletes reviews, questions, settings and sessions; images, events and votes cascade.
 Customer data/redaction webhooks emit `privacy.manual_review_required` with shop, topic

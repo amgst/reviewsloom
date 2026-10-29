@@ -110,7 +110,7 @@ for (const kind of ["reviews", "questions"]) {
       reviewSettings: {
         findUnique: async () => ({
           reviewFormOn: true,
-          customerEligibility: "everyone",
+          customerEligibility: "loggedIn",
         }),
       },
       storefrontRateLimit: { upsert: async () => ({ count: 1 }) },
@@ -154,6 +154,59 @@ for (const kind of ["reviews", "questions"]) {
     assert.ok(!JSON.stringify(stored).includes("customer@example.com"));
   });
 }
+
+test("storefront context does not expose forwarded customer identifiers", async () => {
+  globalThis.__reviewloomTest.db = {
+    reviewSettings: { findUnique: async () => ({ reviewFormOn: true }) },
+  };
+  globalThis.__reviewloomTest.authenticate = {
+    public: { appProxy: async () => ({}) },
+  };
+  const security = await moduleUnderTest(
+    "app/security.server.js",
+    "no-customer-context",
+  );
+  const context = await security.storefrontContext(
+    new Request(
+      "https://app.test/api/reviews?shop=one.myshopify.com&logged_in_customer_id=123456",
+    ),
+  );
+  assert.deepEqual(Object.keys(context).sort(), ["settings", "shop"]);
+  assert.ok(!JSON.stringify(context).includes("123456"));
+});
+
+test("review form stays available to guests despite legacy login restrictions", async () => {
+  globalThis.__reviewloomTest.db = {
+    reviewSettings: {
+      findUnique: async () => ({
+        reviewFormOn: true,
+        customerEligibility: "loggedIn",
+        widgetSeenAt: new Date(),
+      }),
+    },
+    review: {
+      groupBy: async () => [],
+      count: async () => 0,
+      findMany: async () => [],
+    },
+  };
+  globalThis.__reviewloomTest.authenticate = {
+    public: { appProxy: async () => ({}) },
+  };
+  const api = await moduleUnderTest(
+    "app/routes/api.reviews.jsx",
+    "guest-review-form",
+  );
+  const response = await api.loader({
+    request: new Request(
+      "https://app.test/api/reviews?shop=one.myshopify.com&product_id=123",
+    ),
+  });
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.equal(data.settings.reviewFormOn, true);
+  assert.equal("customerEligibility" in data.settings, false);
+});
 
 test("CSV exports cannot include legacy email values", async () => {
   let selection;
