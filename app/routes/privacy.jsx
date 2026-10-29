@@ -59,7 +59,10 @@ export default function Privacy() {
       </p>
       <ul>
         <li>Display name submitted with a review or question.</li>
-        <li>Review content: star rating, written review and photo links.</li>
+        <li>
+          Review content: star rating, written review, uploaded photos and photo
+          links.
+        </li>
         <li>Question content and the merchant's answers.</li>
       </ul>
       <p>
@@ -104,6 +107,13 @@ export default function Privacy() {
         manage reviews and questions.
       </p>
       <p>We do not sell personal information or use it for advertising.</p>
+      <p>
+        Uploaded review photos are stored in the merchant's Shopify Files and
+        served through Shopify's public CDN. They may be accessible to anyone
+        with their URL even before a review is published. Do not upload private
+        or sensitive images. The App stores the file identifiers and links with
+        the review; the image files themselves are hosted by Shopify.
+      </p>
 
       <h2 style={styles.h2}>Sharing</h2>
       <p>
@@ -112,7 +122,10 @@ export default function Privacy() {
       <ul>
         <li>Vercel (application hosting).</li>
         <li>Supabase (PostgreSQL database hosting and data storage).</li>
-        <li>Shopify (the platform the App runs on).</li>
+        <li>
+          Shopify (the platform the App runs on and hosting for uploaded review
+          photos).
+        </li>
       </ul>
       <p>We may also disclose information if required by law.</p>
 

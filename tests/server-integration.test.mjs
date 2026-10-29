@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { build } from "esbuild";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
 
@@ -23,8 +23,7 @@ async function moduleUnderTest(entry, name) {
         setup(builder) {
           builder.onResolve(
             {
-              filter:
-                /(?:db\.server|shopify\.server|resend\.server|discounts\.server)$/,
+              filter: /(?:db\.server|shopify\.server)$/,
             },
             (args) => ({ path: args.path, namespace: "boundary" }),
           );
@@ -33,9 +32,7 @@ async function moduleUnderTest(entry, name) {
               ? "export default globalThis.__reviewloomTest.db;"
               : args.path.endsWith("shopify.server")
                 ? "export const authenticate = globalThis.__reviewloomTest.authenticate; export const unauthenticated = globalThis.__reviewloomTest.unauthenticated;"
-                : args.path.endsWith("discounts.server")
-                  ? "export const createReviewDiscountCode = async () => { throw new Error('Discounts disabled in test') };"
-                  : "export const sendReviewRequestEmail = (...args) => globalThis.__reviewloomTest.send(...args);",
+                : "",
           }));
         },
       },
@@ -43,6 +40,303 @@ async function moduleUnderTest(entry, name) {
   });
   return import(pathToFileURL(outfile));
 }
+
+for (const scenario of [
+  "success",
+  "creation-failure",
+  "association-failure",
+  "disabled",
+]) {
+  test(`review reward flow: ${scenario}`, async () => {
+    let writes = 0;
+    const operations = [];
+    globalThis.__reviewloomTest.db = {
+      reviewSettings: {
+        findUnique: async () => ({
+          reviewFormOn: true,
+          reviewDiscountPercent: scenario === "disabled" ? "none" : "10",
+        }),
+      },
+      storefrontRateLimit: { upsert: async () => ({ count: 1 }) },
+      review: {
+        create: async () => {
+          writes++;
+          return { id: "reward-review", status: "PENDING" };
+        },
+        update: async () => {
+          if (scenario === "association-failure")
+            throw new Error("Database unavailable");
+        },
+      },
+    };
+    globalThis.__reviewloomTest.authenticate = {
+      public: { appProxy: async () => ({}) },
+    };
+    globalThis.__reviewloomTest.unauthenticated = {
+      admin: async () => ({
+        admin: {
+          graphql: async (query, { variables }) => {
+            operations.push({ query, variables });
+            return Response.json(
+              scenario === "creation-failure"
+                ? { errors: [{ message: "Access denied" }] }
+                : {
+                    data: {
+                      discountCodeBasicCreate: {
+                        codeDiscountNode: {
+                          id: "gid://shopify/DiscountCodeNode/1",
+                        },
+                        userErrors: [],
+                      },
+                    },
+                  },
+            );
+          },
+        },
+      }),
+    };
+    const api = await moduleUnderTest(
+      "app/routes/api.reviews.jsx",
+      `reward-${scenario}`,
+    );
+    const response = await api.action({
+      request: new Request(
+        "https://app.test/api/reviews?shop=one.myshopify.com&product_id=123",
+        {
+          method: "POST",
+          body: new URLSearchParams({
+            reviewer: "Alex",
+            rating: "1",
+            body: "Not a great fit",
+          }),
+        },
+      ),
+    });
+    assert.equal(response.status, 201);
+    assert.equal(writes, 1);
+    const result = await response.json();
+    if (scenario === "disabled") {
+      assert.equal(operations.length, 0);
+      assert.equal(result.discountCode, null);
+      assert.equal(result.discountWarning, null);
+    } else if (scenario === "creation-failure") {
+      assert.equal(result.discountCode, null);
+      assert.ok(result.discountWarning.includes("Your review was saved"));
+      assert.ok(!result.discountWarning.includes("Access denied"));
+    } else {
+      assert.match(result.discountCode, /^THANKS10-[A-F0-9]{24}$/);
+      assert.equal(result.discountWarning, null);
+      const input = operations[0].variables.basicCodeDiscount;
+      assert.equal(input.customerGets.value.percentage, 0.1);
+      assert.equal(input.usageLimit, 1);
+      assert.equal(input.appliesOncePerCustomer, true);
+      assert.equal(
+        Date.parse(input.endsAt) - Date.parse(input.startsAt),
+        30 * 86400000,
+      );
+    }
+  });
+}
+
+test("discount helper refuses missing confirmation, Shopify user errors and invalid percentages", async () => {
+  let payload;
+  globalThis.__reviewloomTest.unauthenticated = {
+    admin: async () => ({
+      admin: { graphql: async () => Response.json(payload) },
+    }),
+  };
+  const discounts = await moduleUnderTest(
+    "app/discounts.server.js",
+    "discount-response-validation",
+  );
+  for (payload of [
+    { errors: [{ message: "Access denied" }] },
+    {
+      data: {
+        discountCodeBasicCreate: { codeDiscountNode: null, userErrors: [] },
+      },
+    },
+    {
+      data: {
+        discountCodeBasicCreate: {
+          codeDiscountNode: null,
+          userErrors: [{ message: "Invalid input" }],
+        },
+      },
+    },
+  ]) {
+    await assert.rejects(
+      discounts.createReviewDiscountCode("one.myshopify.com", 20),
+    );
+  }
+  await assert.rejects(
+    discounts.createReviewDiscountCode("one.myshopify.com", 100),
+  );
+});
+
+for (const widget of ["reviews", "embed"]) {
+  test(`${widget} widget displays reward codes and partial-failure warnings`, async () => {
+    const source = await readFile(
+      `extensions/reviewloom-widget/blocks/${widget}.liquid`,
+      "utf8",
+    );
+    const body = source.match(/\.then\(\(result\) => \{ ([^\n]*) \}\)/)?.[1];
+    assert.ok(body);
+    const display = new Function(
+      "result",
+      "status",
+      "form",
+      "state",
+      "load",
+      body,
+    );
+    const status = {};
+    display(
+      { discountCode: "THANKS10-TEST" },
+      status,
+      { reset() {} },
+      {},
+      () => {},
+    );
+    assert.ok(status.textContent.includes("THANKS10-TEST"));
+    assert.ok(status.textContent.includes("30 days"));
+    display(
+      { discountWarning: "Your review was saved, but your reward failed." },
+      status,
+      { reset() {} },
+      {},
+      () => {},
+    );
+    assert.ok(status.textContent.includes("your reward failed"));
+  });
+}
+
+test("photo validation rejects excessive, oversized and disguised files", async () => {
+  const photos = await moduleUnderTest(
+    "app/review-photos.server.js",
+    "photo-validation",
+  );
+  const png = new File(
+    [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0])],
+    "private-name.png",
+    { type: "image/png" },
+  );
+  const valid = await photos.validateReviewPhotos([png]);
+  assert.equal(valid.length, 1);
+  assert.ok(!valid[0].filename.includes("private-name"));
+  for (const files of [
+    Array(4).fill(png),
+    [new File([new Uint8Array(1000001)], "big.png", { type: "image/png" })],
+    [new File(["<svg></svg>"], "fake.png", { type: "image/png" })],
+  ]) {
+    await assert.rejects(
+      photos.validateReviewPhotos(files),
+      (error) => error instanceof Response && error.status === 400,
+    );
+  }
+  const request = new Request("https://app.test/reviews", {
+    method: "POST",
+    body: "small",
+    headers: { "Content-Length": "4000000" },
+  });
+  await assert.rejects(
+    photos.reviewFormData(request),
+    (error) => error instanceof Response && error.status === 400,
+  );
+});
+
+test("review photos use Shopify staging and Files, and clean partial registration failures", async () => {
+  let fail = false;
+  const calls = [];
+  const admin = {
+    graphql: async (query, { variables }) => {
+      calls.push({ query, variables });
+      if (query.includes("StageReviewPhotos"))
+        return Response.json({
+          data: {
+            stagedUploadsCreate: {
+              stagedTargets: [
+                {
+                  url: "https://upload.test",
+                  resourceUrl: "https://resource.test/photo",
+                  parameters: [{ name: "key", value: "temporary-key" }],
+                },
+              ],
+              userErrors: [],
+            },
+          },
+        });
+      if (query.includes("CreateReviewPhotos"))
+        return Response.json({
+          data: {
+            fileCreate: {
+              files: [
+                { id: "gid://shopify/MediaImage/1", fileStatus: "PROCESSING" },
+              ],
+              userErrors: fail ? [{ message: "Rejected" }] : [],
+            },
+          },
+        });
+      if (query.includes("ReviewPhotoStatus"))
+        return Response.json({
+          data: {
+            nodes: [
+              {
+                id: "gid://shopify/MediaImage/1",
+                fileStatus: "READY",
+                image: { url: "https://cdn.shopify.com/photo.png" },
+              },
+            ],
+          },
+        });
+      return Response.json({
+        data: { fileDelete: { deletedFileIds: variables.ids, userErrors: [] } },
+      });
+    },
+  };
+  globalThis.__reviewloomTest.unauthenticated = {
+    admin: async () => ({
+      admin,
+      session: { scope: "read_files,write_files" },
+    }),
+  };
+  const photos = await moduleUnderTest(
+    "app/review-photos.server.js",
+    "shopify-photo-flow",
+  );
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "https://upload.test");
+    assert.equal(options.body.get("key"), "temporary-key");
+    assert.ok(options.body.get("file") instanceof File);
+    return new Response(null, { status: 201 });
+  };
+  try {
+    const input = [
+      {
+        file: new File(["binary"], "photo.png", { type: "image/png" }),
+        mimeType: "image/png",
+        filename: "reviewloom-random.png",
+      },
+    ];
+    const result = await photos.uploadReviewPhotos("one.myshopify.com", input);
+    assert.deepEqual(result, [
+      {
+        shopifyFileId: "gid://shopify/MediaImage/1",
+        url: "https://cdn.shopify.com/photo.png",
+      },
+    ]);
+    assert.equal(calls[0].variables.input[0].resource, "IMAGE");
+    fail = true;
+    await assert.rejects(
+      photos.uploadReviewPhotos("one.myshopify.com", input),
+      (error) => error instanceof Response,
+    );
+    assert.ok(calls.some((call) => call.query.includes("DeleteReviewPhotos")));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("storefront requests authenticate before any database lookup", async () => {
   let queries = 0;

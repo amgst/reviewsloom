@@ -57,7 +57,39 @@ support, permanently delete matched reviews from Trash and delete matched questi
 through the database support process. Do not retain the incoming email as a new record.
 The public privacy page still needs the operator's monitored support email before release.
 
-## Monitoring and retention
+## Shopify review photo uploads
+
+Apply the `20261029180000_shopify_review_photos` migration before deploying the web
+app. Deploy app configuration with `read_files,write_files` added to scopes and
+include these in the hosting environment's SCOPES setting. Existing installations
+must grant the new Files permissions before photo uploads work. No Supabase
+Storage bucket or credentials are required.
+
+The product review block and embed accept up to three JPEG/PNG/WebP images,
+at most 1 MB per file. The server verifies type signatures, limits the complete
+request body to 3.5 MB and uses the existing authenticated app proxy and review
+rate limit. It uploads to Shopify staged targets and creates Files in that shop.
+File IDs and CDN URLs are stored with the review. Deploy the updated extension too.
+Test actual staged upload, processing and a published review on a development store
+after scope approval; mocked tests do not establish live Shopify compatibility.
+
+Shopify Files is public CDN storage, not a private moderation queue. Pending reviews
+stay out of storefront responses, but their file URLs are not private. This is
+disclosed beside the picker and in the privacy policy. Files use randomized names
+and no customer email or original filename is saved.
+
+Failed registrations and failed review saves attempt to delete created Shopify Files.
+Temporary staged objects are managed by Shopify. Alert on `[review.photos]` cleanup
+errors and use the logged file IDs to reconcile any remaining objects. A network
+failure after Shopify accepted fileCreate but before it returned may require merchant
+reconciliation in Content > Files. Completed uploads belong to the merchant's Files
+library: review deletion/uninstall does not currently delete those assets. For a
+photo deletion request, remove its Files asset in Shopify as well as its review
+record; record file IDs before permanently deleting application records.
+Files hosting/serverless execution limits and the merchant's Shopify Files limits
+still apply. Review the hosting timeout to allow transfers and image processing.
+
+## Scheduled cleanup
 
 The authenticated job purges trash older than 30 days, expired rate-limit keys and votes
 older than a year. Active review/question records remain while installed. Verify scheduler
@@ -66,6 +98,19 @@ Monitor `/health` and server errors. Never enable request-body logging for custo
 Configure database backups and test restores in an isolated environment using dummy data.
 
 ## Storefront QA
+
+For reviewer rewards, save 10% or 20% in Settings, submit a review through each
+widget and confirm its code appears both in the success message and Shopify
+Discounts. Test a low rating too: rewards must not depend on rating or moderation.
+On a development store, add an eligible product to a cart, apply the code at
+checkout, and verify the expected percentage and a 30-day expiry. Complete only
+a test order using the store's test payment method to verify the single-redemption
+limit. Each code is single-use; this does not limit a visitor to one rewarded
+submission across all reviews. Set No discount and confirm no new code is created.
+If Shopify rejects creation, the saved review response includes a customer-facing
+reward warning; monitor creation/association failures and resolve the reward through
+merchant support. A valid code is still returned if saving its review association fails.
+Local mocked tests and schema validation do not prove live checkout redemption.
 
 Check review block, embed, carousel, rating badge and Q&A on a development theme. Check
 mobile layout, keyboard use, slow requests, disabled browser storage, moderation and

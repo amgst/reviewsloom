@@ -46,8 +46,9 @@
       <label>Rating <select name="rating" required data-reviewloom-rating-field><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></label>
       <label>Your name <input name="reviewer" type="text" maxlength="100" autocomplete="name" required></label>
       <label>Your review <textarea name="body" rows="4" maxlength="5000" required></textarea></label>
-      <label>Photo URLs (optional, one per line) <textarea name="image_url_lines" rows="2" placeholder="https://example.com/photo1.jpg"></textarea></label>
-      <div><button class="reviewloom-reviews__button" type="submit">Submit for review</button><button class="reviewloom-reviews__cancel" type="button" data-reviewloom-close>Cancel</button></div>
+      <label>Photos (optional) <input name="photo" type="file" accept="image/jpeg,image/png,image/webp" multiple aria-describedby="reviewloom-reviews-photo-help"></label>
+      <p id="reviewloom-reviews-photo-help" class="reviewloom-reviews__photo-help">Choose up to 3 photos, 1 MB each. JPEG, PNG or WebP. Photos are stored in this store's Shopify Files and may be publicly accessible.</p>
+      <div class="reviewloom-reviews__form-actions"><button class="reviewloom-reviews__button" type="submit">Submit for review</button><button class="reviewloom-reviews__cancel" type="button" data-reviewloom-close>Cancel</button></div>
       <p class="reviewloom-reviews__form-status" data-reviewloom-status role="status" aria-live="polite"></p>
     </form>
   {% endif %}
@@ -173,18 +174,17 @@
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const status = form.querySelector('[data-reviewloom-status]');
+    const photos = Array.from(form.querySelector('input[name="photo"]').files || []);
+    if (photos.length > 3 || photos.some((photo) => photo.size > 1000000 || !['image/jpeg', 'image/png', 'image/webp'].includes(photo.type))) { status.textContent = 'Choose up to 3 JPEG, PNG or WebP photos, 1 MB each.'; return; }
     const submitButton = form.querySelector('button[type="submit"]');
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000);
+    const timeout = setTimeout(() => controller.abort(), 60000);
     submitButton.disabled = true;
-    status.textContent = 'Submitting…';
+    status.textContent = photos.length ? 'Uploading photos and submitting your review…' : 'Submitting…';
     const body = new FormData(form);
-    const imageLines = (body.get('image_url_lines') || '').split('\n').map((line) => line.trim()).filter(Boolean);
-    body.delete('image_url_lines');
-    imageLines.forEach((line) => body.append('image_url', line));
     fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`, { method: 'POST', body, signal: controller.signal })
       .then((response) => response.json())
-      .then((result) => { status.textContent = result.error || (result.discountCode ? `Thanks! Your review is waiting for approval. Here's a discount code for you: ${result.discountCode}` : 'Thanks. Your review is waiting for approval.'); if (!result.error) { form.reset(); state.page = 1; load(); } })
+      .then((result) => { status.textContent = result.error || ['Thanks. Your review is waiting for approval.', result.discountCode ? `Your discount code: ${result.discountCode}. Valid for 30 days; one use.` : '', result.discountWarning || ''].filter(Boolean).join(' '); if (!result.error) { form.reset(); state.page = 1; load(); } })
       .catch((error) => { status.textContent = error.name === 'AbortError' ? 'This is taking longer than expected. Please try again in a moment.' : 'Something went wrong submitting your review. Please try again.'; })
       .finally(() => { clearTimeout(timeout); submitButton.disabled = false; });
   });
@@ -253,4 +253,8 @@
 .reviewloom-reviews__pagination button:disabled { opacity: 0.4; cursor: default; }
 .reviewloom-reviews__ellipsis { padding: 0 4px; align-self: center; color: #918878; }
 @media (max-width: 700px) { .reviewloom-reviews__summary-card { flex-direction: column; align-items: flex-start; gap: 20px; } }
+.reviewloom-reviews__form .reviewloom-reviews__form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 20px; }
+.reviewloom-reviews__photo-help { font: 12px/1.5 sans-serif; color: #6b6258; margin: 8px 0 0; }
+.reviewloom-reviews__photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.reviewloom-reviews__photos img { width: 72px; height: 72px; object-fit: cover; border-radius: 6px; }
 </style>

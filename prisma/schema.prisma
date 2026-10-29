@@ -73,11 +73,12 @@ model ReviewEvent {
 }
 
 model ReviewImage {
-  id       String @id @default(cuid())
-  reviewId String
-  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  url      String
-  position Int    @default(0)
+  id            String  @id @default(cuid())
+  reviewId      String
+  review        Review  @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  url           String
+  shopifyFileId String?
+  position      Int     @default(0)
 
   @@index([reviewId])
 }

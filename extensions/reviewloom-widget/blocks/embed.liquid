@@ -12,8 +12,9 @@
       <label>Rating <select name="rating" required><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></label>
       <label>Your name <input name="reviewer" type="text" required></label>
       <label>Your review <textarea name="body" rows="4" required></textarea></label>
-      <label>Photo URL (optional) <input name="image_url" type="url"></label>
-      <div><button class="reviewloom-reviews__button" type="submit">Submit for review</button><button class="reviewloom-reviews__cancel" type="button" data-reviewloom-close>Cancel</button></div>
+      <label>Photos (optional) <input name="photo" type="file" accept="image/jpeg,image/png,image/webp" multiple aria-describedby="reviewloom-embed-photo-help"></label>
+      <p id="reviewloom-embed-photo-help" class="reviewloom-reviews__photo-help">Choose up to 3 photos, 1 MB each. JPEG, PNG or WebP. Photos are stored in this store's Shopify Files and may be publicly accessible.</p>
+      <div class="reviewloom-reviews__form-actions"><button class="reviewloom-reviews__button" type="submit">Submit for review</button><button class="reviewloom-reviews__cancel" type="button" data-reviewloom-close>Cancel</button></div>
       <p class="reviewloom-reviews__form-status" data-reviewloom-status role="status" aria-live="polite"></p>
     </form>
   {% endif %}
@@ -47,7 +48,7 @@
       if (form) form.hidden = true;
     }
     summary.innerHTML = `${stars(Math.round(data.average || 0), outline)} ${data.average} out of 5 · ${data.count} reviews`;
-    list.innerHTML = data.reviews.length ? data.reviews.map((review) => `<article><div>${stars(review.rating, outline)} <strong>${escapeHtml(review.reviewer)}</strong> </div><p>${escapeHtml(review.body)}</p></article>`).join('') : '<p>No reviews yet. Be the first to share your experience.</p>';
+    list.innerHTML = data.reviews.length ? data.reviews.map((review) => `<article><div>${stars(review.rating, outline)} <strong>${escapeHtml(review.reviewer)}</strong> </div><p>${escapeHtml(review.body)}</p><div class="reviewloom-reviews__photos">${(review.images || []).map((url) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(url)}" alt="Customer review photo" width="72" height="72" loading="lazy"></a>`).join('')}</div></article>`).join('') : '<p>No reviews yet. Be the first to share your experience.</p>';
   }).catch(() => { summary.textContent = 'Reviews are temporarily unavailable.'; }).finally(() => clearTimeout(timeout));
   if (!form) return;
   if (openButton) openButton.addEventListener('click', () => { form.hidden = false; form.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
@@ -55,15 +56,17 @@
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const status = form.querySelector('[data-reviewloom-status]');
+    const photos = Array.from(form.querySelector('input[name="photo"]').files || []);
+    if (photos.length > 3 || photos.some((photo) => photo.size > 1000000 || !['image/jpeg', 'image/png', 'image/webp'].includes(photo.type))) { status.textContent = 'Choose up to 3 JPEG, PNG or WebP photos, 1 MB each.'; return; }
     const submitButton = form.querySelector('button[type="submit"]');
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000);
+    const timeout = setTimeout(() => controller.abort(), 60000);
     submitButton.disabled = true;
-    status.textContent = 'Submitting…';
+    status.textContent = photos.length ? 'Uploading photos and submitting your review…' : 'Submitting…';
     const body = new FormData(form);
     fetch(`/apps/reviewloom/reviews?product_id=${encodeURIComponent(productId)}`, { method: 'POST', body, signal: controller.signal })
       .then((response) => response.json())
-      .then((result) => { status.textContent = result.error || 'Thanks. Your review is waiting for approval.'; if (!result.error) form.reset(); })
+      .then((result) => { status.textContent = result.error || ['Thanks. Your review is waiting for approval.', result.discountCode ? `Your discount code: ${result.discountCode}. Valid for 30 days; one use.` : '', result.discountWarning || ''].filter(Boolean).join(' '); if (!result.error) form.reset(); })
       .catch((error) => { status.textContent = error.name === 'AbortError' ? 'This is taking longer than expected. Please try again in a moment.' : 'Something went wrong submitting your review. Please try again.'; })
       .finally(() => { clearTimeout(timeout); submitButton.disabled = false; });
   });
@@ -101,4 +104,8 @@
 .reviewloom-reviews__list article { border-bottom: 1px solid #eee8e1; padding: 18px 0; }.reviewloom-reviews__list p { margin: 9px 0 0; font: 15px/1.5 sans-serif; }
 .reviewloom-reviews__button { border: 0; background: var(--reviewloom-coral); color: white; padding: 11px 16px; cursor: pointer; }.reviewloom-reviews__cancel { border: 0; background: transparent; padding: 11px 16px; cursor: pointer; }
 .reviewloom-reviews__form { background: #f5f0e8; padding: 20px; margin-top: 24px; }.reviewloom-reviews__form label { display: block; margin-top: 12px; }.reviewloom-reviews__form input, .reviewloom-reviews__form textarea, .reviewloom-reviews__form select { display: block; box-sizing: border-box; margin-top: 5px; padding: 10px; width: 100%; border: 1px solid #d9d0c5; background: white; }
+.reviewloom-reviews__form .reviewloom-reviews__form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 20px; }
+.reviewloom-reviews__photo-help { font: 12px/1.5 sans-serif; color: #6b6258; margin: 8px 0 0; }
+.reviewloom-reviews__photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.reviewloom-reviews__photos img { width: 72px; height: 72px; object-fit: cover; border-radius: 6px; }
 </style>

@@ -3,6 +3,12 @@ import prisma from "../db.server";
 import { autoPublishEligibleReviews } from "../reviews.server";
 import { createReviewDiscountCode } from "../discounts.server";
 import {
+  reviewFormData,
+  validateReviewPhotos,
+  uploadReviewPhotos,
+  deleteUploadedPhotos,
+} from "../review-photos.server";
+import {
   storefrontContext,
   limitStorefront,
   visitorKey,
@@ -131,7 +137,7 @@ export const action = async ({ request }) => {
   try {
     const { shop, settings } = await storefrontContext(request);
     const url = new URL(request.url);
-    const data = await request.formData();
+    const data = await reviewFormData(request);
     const productId = url.searchParams.get("product_id");
     if (!productId || productId.length > 100)
       return json({ error: "A product is required." }, { status: 400 });
@@ -185,51 +191,96 @@ export const action = async ({ request }) => {
       return json({ error: "Choose a rating from 1 to 5." }, { status: 400 });
     const reviewer = textField(data, "reviewer", 100, true);
     const body = textField(data, "body", 5000, true);
+    const productName =
+      textField(data, "product_name", 300) || "Product review";
+    const photos = await validateReviewPhotos(data.getAll("photo"));
     const images = data
       .getAll("image_url")
       .map((v) => String(v).trim())
       .filter(Boolean);
     if (
-      images.length > 6 ||
+      images.length + photos.length > 6 ||
       images.some((v) => v.length > 2048 || !httpsUrl(v))
     )
       return json(
         { error: "Use up to six valid HTTPS photo URLs." },
         { status: 400 },
       );
-    const review = await prisma.review.create({
-      data: {
-        shop,
-        productId,
-        productName: textField(data, "product_name", 300) || "Product review",
-        reviewer,
-        rating,
-        body,
-        status: "PENDING",
-        source: "storefront",
-        images: {
-          create: images.map((image, position) => ({
-            url: httpsUrl(image),
-            position,
-          })),
+    const uploaded = await uploadReviewPhotos(shop, photos);
+    let review;
+    try {
+      review = await prisma.review.create({
+        data: {
+          shop,
+          productId,
+          productName,
+          reviewer,
+          rating,
+          body,
+          status: "PENDING",
+          source: "storefront",
+          images: {
+            create: [
+              ...images.map((image) => ({ url: httpsUrl(image) })),
+              ...uploaded,
+            ].map((image, position) => ({
+              ...image,
+              position,
+            })),
+          },
         },
-      },
-    });
+      });
+    } catch (error) {
+      try {
+        await deleteUploadedPhotos(
+          shop,
+          uploaded.map((image) => image.shopifyFileId),
+        );
+      } catch {
+        console.error(
+          "[review.photos] review-save cleanup requires attention",
+          { shop, ids: uploaded.map((image) => image.shopifyFileId) },
+        );
+      }
+      throw error;
+    }
     let discountCode = null;
+    let discountWarning = null;
     const percent = Number(settings.reviewDiscountPercent);
     if (percent > 0) {
       try {
         discountCode = await createReviewDiscountCode(shop, percent);
-        await prisma.review.update({
-          where: { id: review.id, shop },
-          data: { discountCode },
-        });
       } catch (error) {
-        console.error("[review.discount] failed", { code: error.code });
+        discountWarning =
+          "Your review was saved, but we couldn't create your discount code. Please contact the store for your reward; don't submit another review.";
+        console.error("[review.discount] creation failed", {
+          shop,
+          reviewId: review.id,
+          code: error.code,
+        });
+      }
+      if (discountCode) {
+        try {
+          await prisma.review.update({
+            where: { id: review.id, shop },
+            data: { discountCode },
+          });
+        } catch (error) {
+          // The code is valid in Shopify even if linking it to the review fails.
+          console.error("[review.discount] association failed", {
+            shop,
+            reviewId: review.id,
+            code: error.code,
+          });
+        }
       }
     }
     return json(
-      { review: { id: review.id, status: review.status }, discountCode },
+      {
+        review: { id: review.id, status: review.status },
+        discountCode,
+        discountWarning,
+      },
       { status: 201 },
     );
   } catch (error) {
