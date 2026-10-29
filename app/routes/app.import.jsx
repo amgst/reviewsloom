@@ -53,7 +53,6 @@ export const action = async ({ request }) => {
             session.shop,
             row.productId,
             row.reviewer,
-            row.email,
             row.rating,
             row.body,
           ]),
@@ -117,7 +116,7 @@ export default function Import() {
                       <code>body</code> — required
                     </List.Item>
                     <List.Item>
-                      <code>email</code>, <code>image_url</code> — optional
+                      <code>image_url</code> — optional
                     </List.Item>
                   </List>
                   <TextField
@@ -129,7 +128,7 @@ export default function Import() {
                     multiline={8}
                     autoComplete="off"
                     placeholder={
-                      "product_id,product_name,reviewer,email,rating,body,image_url\n7920123,Canvas weekend tote,Jon Bell,jon@example.com,5,Great quality and fast shipping.,"
+                      "product_id,product_name,reviewer,rating,body,image_url\n7920123,Canvas weekend tote,Jon Bell,5,Great quality and fast shipping.,"
                     }
                   />
                   <Button

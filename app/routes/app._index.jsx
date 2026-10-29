@@ -46,7 +46,7 @@ export const loader = async ({ request }) => {
   await autoPublishEligibleReviews(shop, settings.autoPublishThreshold);
   const filters = inboxQuery(new URL(request.url).searchParams);
   const where = inboxWhere(shop, filters);
-  const [total, groups, average, requests] = await Promise.all([
+  const [total, groups, average] = await Promise.all([
     prisma.review.count({ where }),
     prisma.review.groupBy({
       by: ["status"],
@@ -57,7 +57,6 @@ export const loader = async ({ request }) => {
       where: { shop, deletedAt: null, status: "APPROVED" },
       _avg: { rating: true },
     }),
-    prisma.reviewRequest.count({ where: { shop } }),
   ]);
   const page = Math.min(
     filters.page,
@@ -78,6 +77,7 @@ export const loader = async ({ request }) => {
       })
     : [];
   return json({
+    apiKey: process.env.SHOPIFY_API_KEY || "",
     reviews,
     events,
     settings,
@@ -86,7 +86,6 @@ export const loader = async ({ request }) => {
     total,
     counts: Object.fromEntries(groups.map((g) => [g.status, g._count])),
     average: average._avg.rating,
-    requests,
   });
 };
 
@@ -137,6 +136,7 @@ function Stars({ rating }) {
 
 export default function Reviews() {
   const {
+    apiKey,
     reviews,
     events,
     settings,
@@ -145,7 +145,6 @@ export default function Reviews() {
     total,
     counts,
     average,
-    requests,
   } = useLoaderData();
   const fetcher = useFetcher();
   const [params, setParams] = useSearchParams();
@@ -193,8 +192,8 @@ export default function Reviews() {
           <OnboardingWizard
             settings={settings}
             shop={shop}
+            apiKey={apiKey}
             reviewCount={allCount}
-            requestCount={requests}
           />
         ) : null}
         <div className="reviewloom-metrics">
@@ -374,9 +373,7 @@ export default function Reviews() {
                         <Badge tone={statusInfo[review.status]?.[1]}>
                           {statusInfo[review.status]?.[0] || review.status}
                         </Badge>
-                        {review.verifiedPurchase ? (
-                          <Badge tone="success">Verified purchase</Badge>
-                        ) : null}
+
                         {review.source === "import" ? (
                           <Badge>Imported</Badge>
                         ) : null}
@@ -466,7 +463,6 @@ export default function Reviews() {
               <Text as="p">{activeDetail.body}</Text>
               <Text as="p" tone="subdued">
                 {activeDetail.reviewer}
-                {activeDetail.email ? ` · ${activeDetail.email}` : ""}
               </Text>
               <div className="reviewloom-photo-grid">
                 {[

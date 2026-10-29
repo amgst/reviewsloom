@@ -102,173 +102,148 @@ test("a signed proxy without shop context cannot expose storewide data", async (
   assert.equal(queries, 0);
 });
 
-test("verified-buyer restrictions cannot be bypassed with a form flag", async () => {
-  let writes = 0;
+for (const kind of ["reviews", "questions"]) {
+  test(`${kind} ignore legacy email and purchase-invitation fields`, async () => {
+    let stored;
+    const model = kind === "reviews" ? "review" : "question";
+    globalThis.__reviewloomTest.db = {
+      reviewSettings: {
+        findUnique: async () => ({
+          reviewFormOn: true,
+          customerEligibility: "everyone",
+        }),
+      },
+      storefrontRateLimit: { upsert: async () => ({ count: 1 }) },
+      [model]: {
+        create: async ({ data }) => {
+          stored = data;
+          return { id: "created", status: "PENDING" };
+        },
+      },
+    };
+    globalThis.__reviewloomTest.authenticate = {
+      public: { appProxy: async () => ({}) },
+    };
+    const api = await moduleUnderTest(
+      `app/routes/api.${kind}.jsx`,
+      `no-email-${kind}`,
+    );
+    const response = await api.action({
+      request: new Request(
+        `https://app.test/api/${kind}?shop=one.myshopify.com&product_id=123`,
+        {
+          method: "POST",
+          body: new URLSearchParams({
+            rating: "5",
+            reviewer: "Alex",
+            body: "Good",
+            asker: "Alex",
+            question: "What size?",
+            email: "customer@example.com",
+            request_token: "old-token",
+            verifiedPurchase: "true",
+          }),
+        },
+      ),
+    });
+    assert.equal(response.status, 201);
+    assert.ok(stored);
+    assert.equal("email" in stored, false);
+    assert.equal("requestId" in stored, false);
+    assert.equal("verifiedPurchase" in stored, false);
+    assert.ok(!JSON.stringify(stored).includes("customer@example.com"));
+  });
+}
+
+test("CSV exports cannot include legacy email values", async () => {
+  let selection;
   globalThis.__reviewloomTest.db = {
-    reviewSettings: {
-      findUnique: async () => ({
-        reviewFormOn: true,
-        customerEligibility: "verifiedBuyer",
-      }),
-    },
-    storefrontRateLimit: { upsert: async () => ({ count: 1 }) },
     review: {
-      create: async () => {
-        writes++;
+      findMany: async ({ select }) => {
+        selection = select;
+        return [
+          {
+            id: "one",
+            productId: "123",
+            productName: "Shirt",
+            reviewer: "Alex",
+            email: "old@example.com",
+            rating: 5,
+            body: "Good",
+          },
+        ];
       },
     },
   };
   globalThis.__reviewloomTest.authenticate = {
-    public: { appProxy: async () => ({}) },
+    admin: async () => ({ session: { shop: "one.myshopify.com" } }),
   };
   const api = await moduleUnderTest(
-    "app/routes/api.reviews.jsx",
-    "verified-review",
+    "app/routes/app.export.jsx",
+    "no-email-export",
   );
-  const body = new URLSearchParams({
-    rating: "5",
-    reviewer: "Name",
-    body: "Nice",
-    verifiedPurchase: "true",
+  const response = await api.loader({
+    request: new Request("https://app.test/app/export"),
   });
-  const response = await api.action({
-    request: new Request(
-      "https://app.test/api/reviews?shop=one.myshopify.com&product_id=123",
-      { method: "POST", body },
-    ),
+  const csv = await response.text();
+  assert.equal("email" in selection, false);
+  assert.ok(!csv.includes("email"));
+  assert.ok(!csv.includes("old@example.com"));
+});
+
+for (const name of [
+  "webhooks.email",
+  "webhooks.orders",
+  "api.unsubscribe",
+  "app.requests",
+]) {
+  test(`${name} never consumes retired customer payloads`, async () => {
+    globalThis.__reviewloomTest.db = new Proxy(
+      {},
+      {
+        get() {
+          throw new Error("Unexpected database access");
+        },
+      },
+    );
+    globalThis.__reviewloomTest.authenticate = { admin: async () => ({}) };
+    const api = await moduleUnderTest(
+      `app/routes/${name}.jsx`,
+      `retired-${name}`,
+    );
+    const request = new Request(`https://app.test/${name}`, {
+      method: "POST",
+      body: "private payload",
+    });
+    assert.equal((await api.action({ request })).status, 410);
+    assert.equal(request.bodyUsed, false);
   });
-  assert.equal(response.status, 403);
-  assert.equal(writes, 0);
-});
+}
 
-test("concurrent queue workers only send the atomically claimed job once", async () => {
-  const job = {
-    id: "job-1",
-    shop: "one.myshopify.com",
-    email: "customer@example.com",
-    productName: "Shirt",
-    productUrl: "https://one.myshopify.com/products/shirt",
-    attempts: 0,
-    status: "QUEUED",
+test("customer compliance webhook retains no email and requests manual follow-up", async () => {
+  globalThis.__reviewloomTest.db = {};
+  globalThis.__reviewloomTest.authenticate = {
+    webhook: async () => ({
+      shop: "one.myshopify.com",
+      topic: "CUSTOMERS_REDACT",
+      payload: { customer: { email: "private@example.com" } },
+    }),
   };
-  let state = "QUEUED",
-    sends = 0;
-  globalThis.__reviewloomTest.db = {
-    reviewRequest: {
-      findMany: async () => [job],
-      updateMany: async ({ where, data }) => {
-        if (where.id && where.status === "QUEUED") {
-          if (state !== "QUEUED") return { count: 0 };
-          state = data.status;
-          return { count: 1 };
-        }
-        return { count: 0 };
-      },
-      update: async ({ data }) => {
-        state = data.status;
-      },
-    },
-    reviewSettings: { findUnique: async () => ({ requestEmailOn: true }) },
-    emailSuppression: { findUnique: async () => null },
-  };
-  globalThis.__reviewloomTest.send = async () => {
-    sends++;
-    return { data: { id: "provider-id" } };
-  };
-  globalThis.__reviewloomTest.unauthenticated = {};
-  process.env.REVIEW_REQUEST_SECRET = "test-only-secret";
-  const worker = await moduleUnderTest(
-    "app/request-queue.server.js",
-    "queue-concurrency",
+  const api = await moduleUnderTest(
+    "app/routes/webhooks.compliance.jsx",
+    "no-email-compliance",
   );
-  await Promise.all([
-    worker.processRequestQueue(),
-    worker.processRequestQueue(),
-  ]);
-  assert.equal(sends, 1);
-  assert.equal(state, "SENT");
-});
-
-test("a suppressed email is cancelled without contacting the provider", async () => {
-  const job = {
-    id: "job-2",
-    shop: "one.myshopify.com",
-    email: "customer@example.com",
-    attempts: 0,
-  };
-  let sends = 0,
-    state;
-  globalThis.__reviewloomTest.db = {
-    reviewRequest: {
-      findMany: async () => [job],
-      updateMany: async () => ({ count: 1 }),
-      update: async ({ data }) => {
-        state = data.status;
-      },
-    },
-    reviewSettings: { findUnique: async () => ({ requestEmailOn: true }) },
-    emailSuppression: { findUnique: async () => ({ id: "suppressed" }) },
-  };
-  globalThis.__reviewloomTest.send = async () => {
-    sends++;
-  };
-  const worker = await moduleUnderTest(
-    "app/request-queue.server.js",
-    "queue-suppression",
-  );
-  const result = await worker.processRequestQueue();
-  assert.equal(result.cancelled, 1);
-  assert.equal(state, "CANCELLED");
-  assert.equal(sends, 0);
-});
-
-test("retries reuse the saved email payload under the same delivery key", async () => {
-  const job = {
-    id: "retry-job",
-    shop: "one.myshopify.com",
-    email: "customer@example.com",
-    productName: "Shirt",
-    productUrl: "https://one.myshopify.com/products/shirt",
-    attempts: 0,
-    status: "QUEUED",
-  };
-  const payloads = [];
-  globalThis.__reviewloomTest.db = {
-    reviewRequest: {
-      findMany: async () => [{ ...job }],
-      updateMany: async ({ where, data }) => {
-        if (where.id) {
-          if (job.status !== "QUEUED") return { count: 0 };
-          job.status = data.status;
-          job.attempts++;
-          return { count: 1 };
-        }
-        return { count: 0 };
-      },
-      update: async ({ data }) => Object.assign(job, data),
-    },
-    reviewSettings: {
-      findUnique: async () => ({
-        requestEmailOn: true,
-        senderName: payloads.length ? "Changed store name" : "Original store",
-      }),
-    },
-    emailSuppression: { findUnique: async () => null },
-  };
-  globalThis.__reviewloomTest.send = async (payload) => {
-    payloads.push(structuredClone(payload));
-    return payloads.length === 1
-      ? { error: { message: "Temporary failure" } }
-      : { data: { id: "delivered-on-retry" } };
-  };
-  const worker = await moduleUnderTest(
-    "app/request-queue.server.js",
-    "queue-retry",
-  );
-  await worker.processRequestQueue();
-  assert.equal(job.status, "QUEUED");
-  assert.ok(job.deliveryPayload);
-  await worker.processRequestQueue();
-  assert.equal(job.status, "SENT");
-  assert.deepEqual(payloads[0], payloads[1]);
+  const original = console.info;
+  const entries = [];
+  console.info = (entry) => entries.push(entry);
+  try {
+    const response = await api.action({
+      request: new Request("https://app.test/webhooks/compliance"),
+    });
+    assert.equal(response.status, 200);
+    assert.ok(entries[0].includes("privacy.manual_review_required"));
+    assert.ok(!entries[0].includes("private@example.com"));
+  } finally {
+    console.info = original;
+  }
 });

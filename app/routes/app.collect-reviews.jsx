@@ -32,22 +32,10 @@ export default function CollectReviews() {
         </Text>
         <Layout>
           <CollectCard
-            title="Review request"
-            description="Queue customer invitations, track delivery and reviews, and manage retries or cancellations."
-            action="Manage"
-            url="/app/requests"
-          />
-          <CollectCard
             title="Import & export reviews"
             description="Import reviews you already have from other platforms, or export your current reviews, via CSV."
             action="Import / export"
             url="/app/import"
-          />
-          <CollectCard
-            title="Email notifications"
-            description="Configure sender identity, fulfillment delays, reminders, and automatic collection when available."
-            action="Setup"
-            url="/app/settings"
           />
           <CollectCard
             title="Discount"

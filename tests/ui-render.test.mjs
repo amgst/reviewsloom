@@ -15,12 +15,9 @@ const settings = {
   starStyle: "solid",
   alignment: "center",
   reviewFormOn: true,
-  requestEmailOn: true,
   customerEligibility: "everyone",
   autoPublishThreshold: "disabled",
   reviewDiscountPercent: "none",
-  requestDelayDays: 7,
-  reminderDays: 7,
 };
 const review = {
   id: "preview",
@@ -50,12 +47,10 @@ const fixtures = {
       days: null,
       page: 1,
     },
-    requests: 0,
   },
   settings: {
     settings,
     shop: "preview.myshopify.com",
-    automaticApproved: false,
   },
   analytics: {
     days: 7,

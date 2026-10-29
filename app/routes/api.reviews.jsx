@@ -8,9 +8,7 @@ import {
   visitorKey,
   textField,
   httpsUrl,
-  emailAddress,
 } from "../security.server";
-import { readRequestToken } from "../request-tokens";
 
 const SORTS = {
   relevance: [{ helpfulCount: "desc" }, { createdAt: "desc" }],
@@ -82,7 +80,6 @@ export const loader = async ({ request }) => {
           rating: true,
           body: true,
           imageUrl: true,
-          verifiedPurchase: true,
           productName: true,
           createdAt: true,
           helpfulCount: true,
@@ -192,47 +189,11 @@ export const action = async ({ request }) => {
         { error: "Please log in to leave a review." },
         { status: 403 },
       );
-    const tokenValue = String(data.get("request_token") || "");
-    const token = readRequestToken(tokenValue, shop);
-    const invitation = token
-      ? await prisma.reviewRequest.findFirst({
-          where: {
-            id: token.id,
-            shop,
-            productId,
-            completedAt: null,
-            cancelledAt: null,
-            emailId: { not: null },
-          },
-        })
-      : null;
-    if (tokenValue && !invitation)
-      return json(
-        {
-          error:
-            "This review link is expired, already used, or belongs to a different product.",
-        },
-        { status: 400 },
-      );
-    if (
-      settings.customerEligibility === "verifiedBuyer" &&
-      !invitation?.orderVerified
-    )
-      return json(
-        {
-          error:
-            "Use the review link sent after your purchase to leave a verified review.",
-        },
-        { status: 403 },
-      );
     const rating = Number(data.get("rating"));
     if (!Number.isInteger(rating) || rating < 1 || rating > 5)
       return json({ error: "Choose a rating from 1 to 5." }, { status: 400 });
     const reviewer = textField(data, "reviewer", 100, true);
     const body = textField(data, "body", 5000, true);
-    const email = invitation?.email || textField(data, "email", 254);
-    if (email && !emailAddress(email))
-      return json({ error: "Enter a valid email address." }, { status: 400 });
     const images = data
       .getAll("image_url")
       .map((v) => String(v).trim())
@@ -245,46 +206,23 @@ export const action = async ({ request }) => {
         { error: "Use up to six valid HTTPS photo URLs." },
         { status: 400 },
       );
-    const review = await prisma.$transaction(async (tx) => {
-      if (invitation) {
-        const claimed = await tx.reviewRequest.updateMany({
-          where: {
-            id: invitation.id,
-            shop,
-            completedAt: null,
-            cancelledAt: null,
-          },
-          data: { completedAt: new Date() },
-        });
-        if (!claimed.count)
-          throw new Response("This review link has already been used.", {
-            status: 409,
-          });
-      }
-      return tx.review.create({
-        data: {
-          shop,
-          productId,
-          productName:
-            invitation?.productName ||
-            textField(data, "product_name", 300) ||
-            "Product review",
-          reviewer,
-          email: email || null,
-          rating,
-          body,
-          status: "PENDING",
-          verifiedPurchase: Boolean(invitation?.orderVerified),
-          requestId: invitation?.id || null,
-          source: invitation ? "request" : "storefront",
-          images: {
-            create: images.map((image, position) => ({
-              url: httpsUrl(image),
-              position,
-            })),
-          },
+    const review = await prisma.review.create({
+      data: {
+        shop,
+        productId,
+        productName: textField(data, "product_name", 300) || "Product review",
+        reviewer,
+        rating,
+        body,
+        status: "PENDING",
+        source: "storefront",
+        images: {
+          create: images.map((image, position) => ({
+            url: httpsUrl(image),
+            position,
+          })),
         },
-      });
+      },
     });
     let discountCode = null;
     const percent = Number(settings.reviewDiscountPercent);

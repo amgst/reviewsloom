@@ -65,7 +65,3 @@ export function httpsUrl(value) {
     return null;
   }
 }
-
-export function emailAddress(value) {
-  return value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}

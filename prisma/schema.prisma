@@ -40,7 +40,6 @@ model Review {
   productId       String
   productName     String
   reviewer        String
-  email           String?
   rating          Int
   body            String
   imageUrl        String?
@@ -48,8 +47,6 @@ model Review {
   helpfulCount    Int           @default(0)
   notHelpfulCount Int           @default(0)
   discountCode    String?
-  verifiedPurchase Boolean      @default(false)
-  requestId       String?       @unique
   source          String        @default("storefront")
   importKey       String?       @unique
   deletedAt       DateTime?
@@ -62,14 +59,13 @@ model Review {
   @@index([shop, productId, status])
   @@index([shop, deletedAt, createdAt])
   @@index([shop, status, createdAt])
-  @@index([shop, email])
 }
 
 model ReviewEvent {
   id        String   @id @default(cuid())
   shop      String
   reviewId  String
-  review    Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
   action    String
   createdAt DateTime @default(now())
 
@@ -87,82 +83,36 @@ model ReviewImage {
 }
 
 model ReviewSettings {
-  id             String  @id @default(cuid())
-  shop           String  @unique
-  accentColor    String  @default("#D95D39")
-  starStyle      String  @default("solid")
-  alignment      String  @default("center")
-  reviewFormOn   Boolean @default(true)
-  requestEmailOn Boolean @default(true)
-  senderName     String?
-  supportEmail   String?
-  customerEligibility String @default("everyone")
-  autoPublishThreshold String @default("disabled")
-  recycleBinOn         Boolean @default(false)
-  reviewDiscountPercent String @default("none")
+  id                    String    @id @default(cuid())
+  shop                  String    @unique
+  accentColor           String    @default("#D95D39")
+  starStyle             String    @default("solid")
+  alignment             String    @default("center")
+  reviewFormOn          Boolean   @default(true)
+  customerEligibility   String    @default("everyone")
+  autoPublishThreshold  String    @default("disabled")
+  recycleBinOn          Boolean   @default(false)
+  reviewDiscountPercent String    @default("none")
   onboardingCompletedAt DateTime?
   widgetSeenAt          DateTime?
   setupThemeConfirmedAt DateTime?
-  requestDelayDays      Int @default(7)
-  reminderDays          Int @default(7)
-  automaticRequestsOn   Boolean @default(false)
-}
-
-model ReviewRequest {
-  id          String   @id @default(cuid())
-  shop        String
-  orderId     String?
-  email       String
-  productName String
-  productUrl  String?
-  emailId     String?
-  error       String?
-  sentAt      DateTime @default(now())
-  productId   String?
-  status      String   @default("QUEUED")
-  attempts    Int      @default(0)
-  scheduledAt DateTime @default(now())
-  deliveredAt DateTime?
-  bouncedAt   DateTime?
-  completedAt DateTime?
-  cancelledAt DateTime?
-  lockedAt    DateTime?
-  reminderSentAt DateTime?
-  orderVerified Boolean @default(false)
-  parentId    String?
-  deliveryPayload Json?
-  dedupeKey   String? @unique
-  createdAt   DateTime @default(now())
-
-  @@index([shop, sentAt])
-  @@index([status, scheduledAt])
-  @@index([emailId])
-  @@index([shop, createdAt])
-  @@index([shop, orderId])
-  @@index([shop, email])
 }
 
 model StorefrontRateLimit {
-  key       String @id
-  count     Int @default(1)
+  key       String   @id
+  count     Int      @default(1)
   expiresAt DateTime
+
   @@index([expiresAt])
 }
 
-model EmailSuppression {
-  id    String @id @default(cuid())
-  shop  String
-  email String
-  createdAt DateTime @default(now())
-  @@unique([shop, email])
-}
-
 model ReviewVote {
-  id       String @id @default(cuid())
-  reviewId String
-  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  voterKey String
+  id        String   @id @default(cuid())
+  reviewId  String
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  voterKey  String
   createdAt DateTime @default(now())
+
   @@unique([reviewId, voterKey])
   @@index([createdAt])
 }
@@ -174,7 +124,6 @@ model Question {
   productName String
   question    String
   asker       String
-  email       String?
   answer      String?
   answeredAt  DateTime?
   status      String    @default("PENDING")
@@ -182,5 +131,4 @@ model Question {
   updatedAt   DateTime  @updatedAt
 
   @@index([shop, createdAt])
-  @@index([shop, email])
 }

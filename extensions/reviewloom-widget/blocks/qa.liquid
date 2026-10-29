@@ -9,7 +9,6 @@
     <h3>Ask a question</h3>
     <input name="product_name" type="hidden" value="{{ product.title | escape }}">
     <label>Your name <input name="asker" type="text" required></label>
-    <label>Email (optional, so we can let you know when it's answered) <input name="email" type="email"></label>
     <label>Your question <textarea name="question" rows="3" required></textarea></label>
     <div class="reviewloom-qa__actions"><button class="reviewloom-qa__button" type="submit">Submit question</button><button class="reviewloom-qa__cancel" type="button" data-reviewloom-qa-close>Cancel</button></div>
     <p class="reviewloom-qa__form-status" data-reviewloom-qa-status></p>

@@ -1,8 +1,12 @@
 import { redirect } from "@remix-run/node";
 
 export const meta = () => [
-  { title: "ReviewLoom – Product reviews for Shopify" },
-  { name: "description", content: "Collect product reviews with photos and Q&A, and show them with widgets that build shopper trust." },
+  { title: "ReviewLoom â€“ Product reviews for Shopify" },
+  {
+    name: "description",
+    content:
+      "Collect product reviews with photos and Q&A, and show them with widgets that build shopper trust.",
+  },
 ];
 
 export const loader = async ({ request }) => {
@@ -16,12 +20,30 @@ export const loader = async ({ request }) => {
 };
 
 const FEATURES = [
-  { title: "Review requests", text: "Email customers after they buy and turn buyers into reviewers." },
-  { title: "Reviewer rewards", text: "Thank reviewers with a one-time discount code for their next order." },
-  { title: "Photo reviews", text: "Customers add star ratings and photos that show your products in real life." },
-  { title: "Storefront widgets", text: "Review widget, star rating badge and carousel, added from the theme editor." },
-  { title: "Product Q&A", text: "Shoppers ask questions on product pages and you answer them in the app." },
-  { title: "Moderation & analytics", text: "Approve reviews before they go live, import or export by CSV, and track activity." },
+  {
+    title: "Collect feedback",
+    text: "Collect reviews on product pages without asking for customer email addresses.",
+  },
+  {
+    title: "Reviewer rewards",
+    text: "Thank reviewers with a one-time discount code for their next order.",
+  },
+  {
+    title: "Photo reviews",
+    text: "Customers add star ratings and photos that show your products in real life.",
+  },
+  {
+    title: "Storefront widgets",
+    text: "Review widget, star rating badge and carousel, added from the theme editor.",
+  },
+  {
+    title: "Product Q&A",
+    text: "Shoppers ask questions on product pages and you answer them in the app.",
+  },
+  {
+    title: "Moderation & analytics",
+    text: "Approve reviews before they go live, import or export by CSV, and track activity.",
+  },
 ];
 
 const css = `
@@ -54,18 +76,24 @@ export default function Index() {
       <style dangerouslySetInnerHTML={{ __html: css }} />
       <div className="rl-wrap">
         <header className="rl-nav">
-          <div className="rl-logo">Review<span>Loom</span></div>
+          <div className="rl-logo">
+            Review<span>Loom</span>
+          </div>
           <a href="/privacy">Privacy policy</a>
         </header>
 
         <section className="rl-hero">
-          <div className="rl-stars" aria-hidden="true">★★★★★</div>
+          <div className="rl-stars" aria-hidden="true">
+            â˜…â˜…â˜…â˜…â˜…
+          </div>
           <h1>Product reviews that build shopper trust</h1>
           <p>
-            Collect reviews with photos and Q&amp;A, reward the customers who leave them,
-            and show them across your Shopify store.
+            Collect reviews with photos and Q&amp;A, reward the customers who
+            leave them, and show them across your Shopify store.
           </p>
-          <div className="rl-note">Install ReviewLoom from the Shopify App Store</div>
+          <div className="rl-note">
+            Install ReviewLoom from the Shopify App Store
+          </div>
         </section>
 
         <section className="rl-grid">
@@ -78,7 +106,7 @@ export default function Index() {
         </section>
 
         <footer className="rl-foot">
-          <span>© {new Date().getFullYear()} ReviewLoom</span>
+          <span>Â© {new Date().getFullYear()} ReviewLoom</span>
           <a href="/privacy">Privacy policy</a>
         </footer>
       </div>

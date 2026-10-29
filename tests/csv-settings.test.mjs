@@ -29,14 +29,26 @@ test("exports escape spreadsheet formulas and round-trip customer text", () => {
     body,
   );
 });
-test("settings validate input and cannot enable automatic emails before approval", () => {
+test("settings reject removed eligibility and ignore retired email controls", () => {
   const data = new FormData();
   data.set("automaticRequestsOn", "true");
-  assert.equal(settingsInput(data, false).automaticRequestsOn, false);
-  assert.equal(settingsInput(data, true).automaticRequestsOn, true);
+  data.set("requestEmailOn", "true");
+  assert.equal("automaticRequestsOn" in settingsInput(data), false);
+  assert.equal("requestEmailOn" in settingsInput(data), false);
+  data.set("customerEligibility", "verifiedBuyer");
+  assert.throws(() => settingsInput(data));
+  data.set("customerEligibility", "everyone");
   data.set("accentColor", "red; background:url(x)");
-  assert.throws(() => settingsInput(data, true));
-  data.set("accentColor", "#123abc");
-  data.set("requestDelayDays", "-2");
-  assert.throws(() => settingsInput(data, true));
+  assert.throws(() => settingsInput(data));
+});
+test("CSV rejects customer email columns instead of importing or previewing them", () => {
+  const result = parseCsv(
+    `${header},email\n1,Shirt,Alex,5,Great,customer@example.com`,
+  );
+  assert.equal(result.rows.length, 0);
+  assert.ok(result.errors.length);
+  assert.equal(
+    "email" in parseCsv(`${header}\n1,Shirt,Alex,5,Great`).rows[0],
+    false,
+  );
 });

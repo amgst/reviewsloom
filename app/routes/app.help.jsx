@@ -7,8 +7,17 @@ import {
   Text,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { useLoaderData } from "@remix-run/react";
+import { authenticate } from "../shopify.server";
+import { ThemeSetupGuide } from "../components/ThemeSetupGuide";
+
+export const loader = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
+  return { shop: session.shop, apiKey: process.env.SHOPIFY_API_KEY || "" };
+};
 
 export default function Help() {
+  const { shop, apiKey } = useLoaderData();
   return (
     <Page
       title="Help & getting started"
@@ -21,19 +30,13 @@ export default function Help() {
             <Text as="h2" variant="headingLg">
               Install your storefront widget
             </Text>
-            <Text as="p">
-              Open your theme editor and select a product template. Add the
-              ReviewLoom Reviews app block, or enable the auto-embed in App
-              embeds, then save. Preview a product that uses that template on
-              both desktop and mobile.
-            </Text>
+            <ThemeSetupGuide shop={shop} apiKey={apiKey} detailed />
             <Text as="p" tone="subdued">
               Use one main reviews widget per product page. Your setup checklist
               detects a widget connection; you still need to check its placement
               in the theme.
             </Text>
             <InlineStack gap="200">
-              <Button url="/app/settings">Customize widget</Button>
               <Button url="/app">Open setup checklist</Button>
             </InlineStack>
           </BlockStack>
@@ -58,36 +61,12 @@ export default function Help() {
         <Card>
           <BlockStack gap="300">
             <Text as="h2" variant="headingLg">
-              Understand request statuses
-            </Text>
-            <Text as="p">
-              Queued means a request is waiting for delivery. Sent means the
-              email provider accepted it. Delivered means delivery was
-              confirmed. Review received means the customer submitted feedback
-              through their invitation link.
-            </Text>
-            <Text as="p">
-              Failed requests can be retried. Customers who unsubscribe or
-              bounce are excluded from future requests. Automatic collection
-              becomes available after the app has the required Shopify access.
-            </Text>
-            <Button url="/app/requests">Manage requests</Button>
-          </BlockStack>
-        </Card>
-        <Card>
-          <BlockStack gap="300">
-            <Text as="h2" variant="headingLg">
               Import authentic feedback
             </Text>
             <Text as="p">
               Paste a CSV with product ID, product name, reviewer, rating, and
               review body. Preview the rows before confirming. Imported reviews
               enter Pending, and matching repeat imports are skipped.
-            </Text>
-            <Text as="p" tone="subdued">
-              Verified purchase labels are reserved for reviews linked to a
-              verified order invitation. Imported reviews do not receive that
-              label.
             </Text>
             <Button url="/app/import">Import / export</Button>
           </BlockStack>

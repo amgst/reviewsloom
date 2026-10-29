@@ -24,28 +24,26 @@ export const loader = async ({ request }) => {
   const start = new Date(end.getTime() - days * 86400000);
   const previous = new Date(start.getTime() - days * 86400000);
   const where = { shop, deletedAt: null, createdAt: { gte: start, lt: end } };
-  const [current, prior, approved, dailyRows, products, funnelRows] =
-    await Promise.all([
-      prisma.review.aggregate({ where, _count: true, _avg: { rating: true } }),
-      prisma.review.count({
-        where: {
-          shop,
-          deletedAt: null,
-          createdAt: { gte: previous, lt: start },
-        },
-      }),
-      prisma.review.count({ where: { ...where, status: "APPROVED" } }),
-      prisma.$queryRaw`SELECT to_char("createdAt", 'YYYY-MM-DD') AS day, COUNT(*)::int AS count FROM "Review" WHERE shop = ${shop} AND "deletedAt" IS NULL AND "createdAt" >= ${start} AND "createdAt" < ${end} GROUP BY day ORDER BY day`,
-      prisma.review.groupBy({
-        by: ["productId", "productName"],
-        where,
-        _count: true,
-        _avg: { rating: true },
-        orderBy: { _count: { productId: "desc" } },
-        take: 10,
-      }),
-      prisma.$queryRaw`SELECT COUNT(*)::int AS queued, COUNT(*) FILTER (WHERE r."emailId" IS NOT NULL)::int AS sent, COUNT(*) FILTER (WHERE r."deliveredAt" IS NOT NULL)::int AS delivered, COUNT(*) FILTER (WHERE r."bouncedAt" IS NOT NULL)::int AS bounced, COUNT(*) FILTER (WHERE r."completedAt" IS NOT NULL)::int AS completed, COUNT(*) FILTER (WHERE v.status = 'APPROVED' AND v."deletedAt" IS NULL)::int AS published FROM "ReviewRequest" r LEFT JOIN "Review" v ON v."requestId" = r.id AND v.shop = r.shop WHERE r.shop = ${shop} AND r."parentId" IS NULL AND r."createdAt" >= ${start} AND r."createdAt" < ${end}`,
-    ]);
+  const [current, prior, approved, dailyRows, products] = await Promise.all([
+    prisma.review.aggregate({ where, _count: true, _avg: { rating: true } }),
+    prisma.review.count({
+      where: {
+        shop,
+        deletedAt: null,
+        createdAt: { gte: previous, lt: start },
+      },
+    }),
+    prisma.review.count({ where: { ...where, status: "APPROVED" } }),
+    prisma.$queryRaw`SELECT to_char("createdAt", 'YYYY-MM-DD') AS day, COUNT(*)::int AS count FROM "Review" WHERE shop = ${shop} AND "deletedAt" IS NULL AND "createdAt" >= ${start} AND "createdAt" < ${end} GROUP BY day ORDER BY day`,
+    prisma.review.groupBy({
+      by: ["productId", "productName"],
+      where,
+      _count: true,
+      _avg: { rating: true },
+      orderBy: { _count: { productId: "desc" } },
+      take: 10,
+    }),
+  ]);
   const daily = Array.from({ length: days }, (_, index) => {
     const day = new Date(start.getTime() + index * 86400000)
       .toISOString()
@@ -64,12 +62,11 @@ export const loader = async ({ request }) => {
       count: p._count,
       average: p._avg.rating,
     })),
-    funnel: funnelRows[0],
   });
 };
 
 export default function Analytics() {
-  const { days, current, average, prior, approved, daily, products, funnel } =
+  const { days, current, average, prior, approved, daily, products } =
     useLoaderData();
   const [, setParams] = useSearchParams();
   const change = prior
@@ -119,48 +116,6 @@ export default function Analytics() {
             </Card>
           ))}
         </div>
-        <Card>
-          <BlockStack gap="400">
-            <Text as="h2" variant="headingLg">
-              Review request funnel
-            </Text>
-            <Text as="p" tone="subdued">
-              Original requests created in this period. Delivery and review
-              outcomes update as customers respond. Reminders are excluded.
-            </Text>
-            <div className="reviewloom-funnel">
-              {[
-                ["Queued", funnel.queued],
-                ["Sent", funnel.sent],
-                ["Delivered", funnel.delivered],
-                ["Review received", funnel.completed],
-                ["Published", funnel.published],
-              ].map(([title, value]) => (
-                <div key={title}>
-                  <Text as="p" variant="headingXl">
-                    {value}
-                  </Text>
-                  <Text as="h3" variant="headingSm">
-                    {title}
-                  </Text>
-                </div>
-              ))}
-            </div>
-            <InlineStack gap="500">
-              <Text as="p">
-                Request completion:{" "}
-                {funnel.sent
-                  ? `${((funnel.completed / funnel.sent) * 100).toFixed(1)}%`
-                  : "—"}
-              </Text>
-              <Text as="p">Bounces: {funnel.bounced}</Text>
-            </InlineStack>
-            <Text as="p" tone="subdued">
-              Delivered counts require email provider webhook configuration.
-              Revenue attribution is not tracked.
-            </Text>
-          </BlockStack>
-        </Card>
         <Card>
           <BlockStack gap="400">
             <Text as="h2" variant="headingLg">

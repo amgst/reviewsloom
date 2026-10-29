@@ -23,6 +23,7 @@ import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { settingsInput } from "../settings-validation";
+import { ThemeSetupGuide } from "../components/ThemeSetupGuide";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -34,9 +35,7 @@ export const loader = async ({ request }) => {
   return json({
     settings,
     shop: session.shop,
-    automaticApproved:
-      process.env.AUTOMATIC_REQUESTS_APPROVED === "true" &&
-      session.scope?.split(",").includes("read_orders"),
+    apiKey: process.env.SHOPIFY_API_KEY || "",
   });
 };
 
@@ -54,11 +53,7 @@ export const action = async ({ request }) => {
 
   let data;
   try {
-    data = settingsInput(
-      formData,
-      process.env.AUTOMATIC_REQUESTS_APPROVED === "true" &&
-        session.scope?.split(",").includes("read_orders"),
-    );
+    data = settingsInput(formData);
   } catch (error) {
     return json({ error: error.message }, { status: 400 });
   }
@@ -71,30 +66,18 @@ export const action = async ({ request }) => {
 };
 
 export default function Settings() {
-  const { settings, shop, automaticApproved } = useLoaderData();
+  const { settings, shop, apiKey } = useLoaderData();
   const actionData = useActionData();
   const navigation = useNavigation();
   const [accentColor, setAccentColor] = useState(settings.accentColor);
   const [starStyle, setStarStyle] = useState(settings.starStyle);
   const [alignment, setAlignment] = useState(settings.alignment);
   const [reviewFormOn, setReviewFormOn] = useState(settings.reviewFormOn);
-  const [requestEmailOn, setRequestEmailOn] = useState(settings.requestEmailOn);
-  const [senderName, setSenderName] = useState(settings.senderName || "");
-  const [supportEmail, setSupportEmail] = useState(settings.supportEmail || "");
   const [customerEligibility, setCustomerEligibility] = useState(
     settings.customerEligibility || "everyone",
   );
   const [autoPublishThreshold, setAutoPublishThreshold] = useState(
     settings.autoPublishThreshold || "disabled",
-  );
-  const [automaticRequestsOn, setAutomaticRequestsOn] = useState(
-    settings.automaticRequestsOn && automaticApproved,
-  );
-  const [requestDelayDays, setRequestDelayDays] = useState(
-    String(settings.requestDelayDays),
-  );
-  const [reminderDays, setReminderDays] = useState(
-    String(settings.reminderDays),
   );
   const [reviewDiscountPercent, setReviewDiscountPercent] = useState(
     settings.reviewDiscountPercent || "none",
@@ -112,21 +95,9 @@ export default function Settings() {
             <Card>
               <BlockStack gap="300">
                 <Text as="h2" variant="headingLg">
-                  Change your theme
+                  Add reviews to your theme
                 </Text>
-                <Text as="p" tone="subdued">
-                  Add the Reviews app block to a product template, or enable the
-                  auto-embed from App embeds. Save your theme and preview a
-                  product page.
-                </Text>
-                <InlineStack>
-                  <Button
-                    url={`https://${shop}/admin/themes/current/editor?context=apps`}
-                    target="_blank"
-                  >
-                    Open theme editor
-                  </Button>
-                </InlineStack>
+                <ThemeSetupGuide shop={shop} apiKey={apiKey} />
               </BlockStack>
             </Card>
             <Card>
@@ -136,7 +107,7 @@ export default function Settings() {
                 </Text>
                 <Text as="p" tone="subdued">
                   Reopen the setup checklist for widget installation, storefront
-                  preview, and your first review request.
+                  preview, and your first review.
                 </Text>
                 <Form method="post">
                   <input
@@ -240,13 +211,6 @@ export default function Settings() {
                         onChange={() => setCustomerEligibility("loggedIn")}
                       />
                       <RadioButton
-                        label="Only verified buyers can write reviews"
-                        checked={customerEligibility === "verifiedBuyer"}
-                        id="customerEligibility-verifiedBuyer"
-                        name="customerEligibility-display"
-                        onChange={() => setCustomerEligibility("verifiedBuyer")}
-                      />
-                      <RadioButton
                         label="Everyone can write reviews"
                         checked={customerEligibility === "everyone"}
                         id="customerEligibility-everyone"
@@ -319,56 +283,6 @@ export default function Settings() {
                       checked={reviewFormOn}
                       onChange={setReviewFormOn}
                     />
-                    <input
-                      type="hidden"
-                      name="requestEmailOn"
-                      value={requestEmailOn ? "true" : "false"}
-                    />
-                    <Checkbox
-                      label="Enable review request emails"
-                      checked={requestEmailOn}
-                      onChange={setRequestEmailOn}
-                    />
-                    <input
-                      type="hidden"
-                      name="automaticRequestsOn"
-                      value={automaticRequestsOn ? "true" : "false"}
-                    />
-                    <Checkbox
-                      label="Automatically request reviews after fulfillment"
-                      checked={automaticRequestsOn}
-                      onChange={setAutomaticRequestsOn}
-                      disabled={!automaticApproved}
-                      helpText={
-                        automaticApproved
-                          ? "Requires the order webhook subscriptions and background worker described in the operations guide."
-                          : "Available after Shopify protected customer data approval, read_orders access, and production configuration."
-                      }
-                    />
-                    <TextField
-                      label="Delay after fulfillment (days)"
-                      name="requestDelayDays"
-                      type="number"
-                      min={1}
-                      max={30}
-                      value={requestDelayDays}
-                      onChange={setRequestDelayDays}
-                      autoComplete="off"
-                    />
-                    <Select
-                      label="One reminder after the first request"
-                      name="reminderDays"
-                      value={reminderDays}
-                      onChange={setReminderDays}
-                      options={[
-                        { label: "No reminder", value: "0" },
-                        ...[3, 7, 14].map((n) => ({
-                          label: `${n} days`,
-                          value: String(n),
-                        })),
-                      ]}
-                      helpText="Automatic requests only. Customers who reply, unsubscribe, or bounce are excluded."
-                    />
                   </BlockStack>
                 </Card>
                 <Card>
@@ -421,31 +335,6 @@ export default function Settings() {
                         onChange={() => setReviewDiscountPercent("none")}
                       />
                     </BlockStack>
-                  </BlockStack>
-                </Card>
-                <Card>
-                  <BlockStack gap="400">
-                    <Text as="h2" variant="headingLg">
-                      Review request emails
-                    </Text>
-                    <TextField
-                      label="Sender name"
-                      name="senderName"
-                      value={senderName}
-                      onChange={setSenderName}
-                      autoComplete="off"
-                      placeholder="Your store name"
-                      helpText="Shown as the email sender, e.g. “Your Store via Review Loom”. Defaults to your shop name if left blank."
-                    />
-                    <TextField
-                      label="Support email"
-                      name="supportEmail"
-                      type="email"
-                      value={supportEmail}
-                      onChange={setSupportEmail}
-                      autoComplete="off"
-                      helpText="Customer replies to review request emails go here instead of to us."
-                    />
                   </BlockStack>
                 </Card>
                 <Button

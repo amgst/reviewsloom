@@ -52,6 +52,13 @@ export function parseCsv(text) {
   if (records.length > 501)
     return { rows: [], errors: ["Import up to 500 reviews at a time."] };
   const header = records.shift().map((v) => v.toLowerCase());
+  if (header.some((name) => ![...REQUIRED_COLUMNS, "image_url"].includes(name)))
+    return {
+      rows: [],
+      errors: [
+        "Use only product_id, product_name, reviewer, rating, body and optional image_url columns. Remove email and other unsupported columns before uploading.",
+      ],
+    };
   const missing = REQUIRED_COLUMNS.filter((column) => !header.includes(column));
   if (missing.length || new Set(header).size !== header.length)
     return {
@@ -93,11 +100,10 @@ export function parseCsv(text) {
       row.body.length > 5000 ||
       row.reviewer.length > 100 ||
       row.product_name.length > 300 ||
-      row.product_id.length > 100 ||
-      (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email))
+      row.product_id.length > 100
     ) {
       errors.push(
-        `Row ${index + 2}: check required fields, field lengths, column count, email, and rating (1–5).`,
+        `Row ${index + 2}: check required fields, field lengths, column count, and rating (1–5).`,
       );
       return;
     }
@@ -105,7 +111,6 @@ export function parseCsv(text) {
       productId: row.product_id,
       productName: row.product_name,
       reviewer: row.reviewer,
-      email: row.email?.toLowerCase() || null,
       rating,
       body: row.body,
       imageUrl,

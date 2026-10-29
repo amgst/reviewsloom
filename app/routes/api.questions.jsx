@@ -4,7 +4,6 @@ import {
   storefrontContext,
   limitStorefront,
   textField,
-  emailAddress,
 } from "../security.server";
 
 export const loader = async ({ request }) => {
@@ -43,9 +42,6 @@ export const action = async ({ request }) => {
   const productId = new URL(request.url).searchParams.get("product_id");
   if (!productId || productId.length > 100)
     return json({ error: "A product is required." }, { status: 400 });
-  const email = textField(data, "email", 254);
-  if (email && !emailAddress(email))
-    return json({ error: "Enter a valid email." }, { status: 400 });
   const question = await prisma.question.create({
     data: {
       shop,
@@ -53,7 +49,6 @@ export const action = async ({ request }) => {
       productName: textField(data, "product_name", 300) || "Product question",
       question: textField(data, "question", 3000, true),
       asker: textField(data, "asker", 100, true),
-      email: email || null,
       status: "PENDING",
     },
   });

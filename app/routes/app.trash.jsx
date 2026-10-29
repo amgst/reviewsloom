@@ -98,7 +98,7 @@ export default function Trash() {
                     </InlineStack>
                     <Text as="p">&quot;{review.body}&quot;</Text>
                     <Text as="p" tone="subdued">
-                      {review.reviewer} · {review.email}
+                      {review.reviewer}
                     </Text>
                   </div>
                   <InlineStack gap="200">

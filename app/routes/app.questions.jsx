@@ -102,7 +102,6 @@ function QuestionRow({ question }) {
             <Text as="p">&quot;{question.question}&quot;</Text>
             <Text as="p" tone="subdued">
               {question.asker}
-              {question.email ? ` · ${question.email}` : ""}
             </Text>
           </div>
           <Badge tone={statusTone(question.status)}>
