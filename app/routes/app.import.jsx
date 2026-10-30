@@ -21,10 +21,11 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { boundedFormData } from "../security.server";
 
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  const formData = await request.formData();
+  const formData = await boundedFormData(request, 2_500_000);
   const csv = String(formData.get("csv") || "");
   const { rows, errors } = parseCsv(csv);
   if (errors.length || !rows.length)
@@ -142,7 +143,11 @@ export default function Import() {
               </BlockStack>
             </Card>
             <Card>
-              <Form method="post" onSubmit={() => setPreviewText(csv)}>
+              <Form
+                method="post"
+                encType="multipart/form-data"
+                onSubmit={() => setPreviewText(csv)}
+              >
                 <BlockStack gap="400">
                   <Text as="h2" variant="headingLg">
                     Import reviews from a CSV
@@ -229,7 +234,7 @@ export default function Import() {
                               digest: actionData.digest,
                               intent: "import",
                             },
-                            { method: "post" },
+                            { method: "post", encType: "multipart/form-data" },
                           )
                         }
                         variant="primary"
@@ -238,7 +243,8 @@ export default function Import() {
                       </Button>
                     </BlockStack>
                   ) : null}
-                  {actionData?.imported !== undefined ? (
+                  {actionData?.imported !== undefined &&
+                  !actionData.errors?.length ? (
                     <Text as="p" tone="success">
                       Imported {actionData.imported} review(s); skipped{" "}
                       {actionData.skipped || 0} duplicate(s).

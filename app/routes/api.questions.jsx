@@ -4,6 +4,8 @@ import {
   storefrontContext,
   limitStorefront,
   textField,
+  boundedFormData,
+  limitShopAction,
 } from "../security.server";
 
 export const loader = async ({ request }) => {
@@ -38,7 +40,8 @@ export const loader = async ({ request }) => {
 export const action = async ({ request }) => {
   const { shop } = await storefrontContext(request);
   await limitStorefront(request, shop, "question");
-  const data = await request.formData();
+  await limitShopAction(shop, "questions");
+  const data = await boundedFormData(request, 24_000);
   const productId = new URL(request.url).searchParams.get("product_id");
   if (!productId || productId.length > 100)
     return json({ error: "A product is required." }, { status: 400 });

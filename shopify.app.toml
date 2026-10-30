@@ -27,7 +27,7 @@ api_version = "2026-10"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_products,write_products,write_themes,write_discounts,read_files,write_files"
+scopes = "read_products,write_discounts,read_files,write_files"
 
 [auth]
 redirect_urls = [ "https://reviewsloom.vercel.app/auth/callback" ]

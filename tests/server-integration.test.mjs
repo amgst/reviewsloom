@@ -7,6 +7,7 @@ import path from "node:path";
 
 await mkdir(".cache/test-modules", { recursive: true });
 globalThis.__reviewloomTest = {};
+process.env.SHOPIFY_API_SECRET ||= "reviewloom-test-only-secret";
 async function moduleUnderTest(entry, name) {
   const outfile = path.resolve(`.cache/test-modules/${name}.mjs`);
   await build({
@@ -41,6 +42,154 @@ async function moduleUnderTest(entry, name) {
   return import(pathToFileURL(outfile));
 }
 
+test("signed proxy requests without an installed shop session cannot touch data", async () => {
+  let reads = 0;
+  globalThis.__reviewloomTest.db = {
+    reviewSettings: {
+      findUnique: async () => {
+        reads++;
+      },
+    },
+  };
+  globalThis.__reviewloomTest.authenticate = {
+    public: { appProxy: async () => ({}) },
+  };
+  const api = await moduleUnderTest(
+    "app/routes/api.reviews.jsx",
+    "uninstalled-proxy",
+  );
+  const response = await api.loader({
+    request: new Request("https://app.test/api/reviews?shop=one.myshopify.com"),
+  });
+  assert.equal(response.status, 401);
+  assert.equal(reads, 0);
+});
+
+test("bounded forms reject streamed oversize bodies and file-valued text fields", async () => {
+  const security = await moduleUnderTest(
+    "app/security.server.js",
+    "bounded-forms",
+  );
+  await assert.rejects(
+    security.boundedFormData(
+      new Request("https://app.test", {
+        method: "POST",
+        body: "field=too-long",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      }),
+      4,
+    ),
+    (error) => error instanceof Response && error.status === 413,
+  );
+  const form = new FormData();
+  form.set("reviewer", new File(["fake"], "fake.txt"));
+  assert.throws(
+    () => security.textField(form, "reviewer", 100, true),
+    (error) => error instanceof Response && error.status === 400,
+  );
+});
+
+test("store-wide daily budgets remain shared when visitors rotate addresses", async () => {
+  const counters = new Map();
+  globalThis.__reviewloomTest.db = {
+    storefrontRateLimit: {
+      upsert: async ({ where }) => {
+        const count = (counters.get(where.key) || 0) + 1;
+        counters.set(where.key, count);
+        return { count };
+      },
+    },
+  };
+  const security = await moduleUnderTest(
+    "app/security.server.js",
+    "shop-budget",
+  );
+  await security.limitShopAction("one.myshopify.com", "reviews", 1);
+  await assert.rejects(
+    security.limitShopAction("one.myshopify.com", "reviews", 1),
+    (error) => error instanceof Response && error.status === 429,
+  );
+  await security.limitShopAction("two.myshopify.com", "reviews", 1);
+  assert.equal(counters.size, 2);
+});
+
+test("question moderation rejects missing identifiers before querying", async () => {
+  globalThis.__reviewloomTest.authenticate = {
+    admin: async () => ({ session: { shop: "one.myshopify.com" } }),
+  };
+  globalThis.__reviewloomTest.db = new Proxy(
+    {},
+    {
+      get() {
+        throw new Error("Unexpected query");
+      },
+    },
+  );
+  const api = await moduleUnderTest(
+    "app/routes/app.questions.jsx",
+    "question-invalid-id",
+  );
+  const response = await api.action({
+    request: new Request("https://app.test/app/questions", {
+      method: "POST",
+      body: new URLSearchParams({ intent: "reject" }),
+    }),
+  });
+  assert.equal(response.status, 400);
+});
+
+test("nonexistent products cannot create rewarded reviews or Shopify files", async () => {
+  let writes = 0;
+  globalThis.__reviewloomTest.authenticate = {
+    public: {
+      appProxy: async () => ({ session: { shop: "one.myshopify.com" } }),
+    },
+  };
+  globalThis.__reviewloomTest.db = {
+    reviewSettings: {
+      findUnique: async () => ({
+        reviewFormOn: true,
+        reviewDiscountPercent: "10",
+      }),
+    },
+    storefrontRateLimit: { upsert: async () => ({ count: 1 }) },
+    review: {
+      create: async () => {
+        writes++;
+      },
+    },
+  };
+  globalThis.__reviewloomTest.unauthenticated = {
+    admin: async () => ({
+      admin: {
+        graphql: async (query) => {
+          assert.ok(query.includes("ReviewableProduct"));
+          return Response.json({ data: { product: null } });
+        },
+      },
+    }),
+  };
+  const api = await moduleUnderTest(
+    "app/routes/api.reviews.jsx",
+    "missing-reward-product",
+  );
+  const response = await api.action({
+    request: new Request(
+      "https://app.test/api/reviews?shop=one.myshopify.com&product_id=123",
+      {
+        method: "POST",
+        body: new URLSearchParams({
+          reviewer: "Alex",
+          rating: "5",
+          body: "Review",
+        }),
+      },
+    ),
+  });
+  assert.equal(response.status, 400);
+  assert.equal(writes, 0);
+});
+
 for (const scenario of [
   "success",
   "creation-failure",
@@ -70,12 +219,24 @@ for (const scenario of [
       },
     };
     globalThis.__reviewloomTest.authenticate = {
-      public: { appProxy: async () => ({}) },
+      public: {
+        appProxy: async () => ({ session: { shop: "one.myshopify.com" } }),
+      },
     };
     globalThis.__reviewloomTest.unauthenticated = {
       admin: async () => ({
         admin: {
           graphql: async (query, { variables }) => {
+            if (query.includes("ReviewableProduct"))
+              return Response.json({
+                data: {
+                  product: {
+                    id: variables.id,
+                    status: "ACTIVE",
+                    onlineStoreUrl: "https://one.myshopify.com/products/shirt",
+                  },
+                },
+              });
             operations.push({ query, variables });
             return Response.json(
               scenario === "creation-failure"
@@ -382,7 +543,9 @@ test("a signed proxy without shop context cannot expose storewide data", async (
     },
   };
   globalThis.__reviewloomTest.authenticate = {
-    public: { appProxy: async () => ({}) },
+    public: {
+      appProxy: async () => ({ session: { shop: "one.myshopify.com" } }),
+    },
   };
   const api = await moduleUnderTest(
     "app/routes/api.reviews.jsx",
@@ -416,7 +579,9 @@ for (const kind of ["reviews", "questions"]) {
       },
     };
     globalThis.__reviewloomTest.authenticate = {
-      public: { appProxy: async () => ({}) },
+      public: {
+        appProxy: async () => ({ session: { shop: "one.myshopify.com" } }),
+      },
     };
     const api = await moduleUnderTest(
       `app/routes/api.${kind}.jsx`,
@@ -454,7 +619,9 @@ test("storefront context does not expose forwarded customer identifiers", async 
     reviewSettings: { findUnique: async () => ({ reviewFormOn: true }) },
   };
   globalThis.__reviewloomTest.authenticate = {
-    public: { appProxy: async () => ({}) },
+    public: {
+      appProxy: async () => ({ session: { shop: "one.myshopify.com" } }),
+    },
   };
   const security = await moduleUnderTest(
     "app/security.server.js",
@@ -485,7 +652,9 @@ test("review form stays available to guests despite legacy login restrictions", 
     },
   };
   globalThis.__reviewloomTest.authenticate = {
-    public: { appProxy: async () => ({}) },
+    public: {
+      appProxy: async () => ({ session: { shop: "one.myshopify.com" } }),
+    },
   };
   const api = await moduleUnderTest(
     "app/routes/api.reviews.jsx",
@@ -515,6 +684,7 @@ test("CSV exports cannot include legacy email values", async () => {
             productName: "Shirt",
             reviewer: "Alex",
             email: "old@example.com",
+            images: [{ url: "https://cdn.shopify.com/review-photo.png" }],
             rating: 5,
             body: "Good",
           },
@@ -536,6 +706,7 @@ test("CSV exports cannot include legacy email values", async () => {
   assert.equal("email" in selection, false);
   assert.ok(!csv.includes("email"));
   assert.ok(!csv.includes("old@example.com"));
+  assert.ok(csv.includes("https://cdn.shopify.com/review-photo.png"));
 });
 
 for (const name of [

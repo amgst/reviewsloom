@@ -21,7 +21,10 @@ export async function autoPublishEligibleReviews(shop, threshold) {
     });
     threshold = settings?.autoPublishThreshold;
   }
-  const filter = threshold && THRESHOLD_FILTERS[threshold];
+  const filter =
+    threshold &&
+    Object.hasOwn(THRESHOLD_FILTERS, threshold) &&
+    THRESHOLD_FILTERS[threshold];
   if (!filter) return 0;
   const cutoff = new Date(Date.now() - AUTO_PUBLISH_DAYS * 24 * 60 * 60 * 1000);
   return prisma.$transaction(async (tx) => {

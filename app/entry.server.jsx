@@ -39,7 +39,10 @@ export default async function handleRequest(
         },
         onError(error) {
           responseStatusCode = 500;
-          console.error(error);
+          console.error("[render] failed", {
+            name: error?.name,
+            code: error?.code,
+          });
         },
       },
     );

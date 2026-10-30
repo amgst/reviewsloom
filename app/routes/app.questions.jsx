@@ -15,6 +15,7 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { boundedFormData } from "../security.server";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -28,15 +29,17 @@ export const loader = async ({ request }) => {
 
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  const formData = await request.formData();
+  const formData = await boundedFormData(request);
   const intent = formData.get("intent");
   const id = formData.get("id");
+  if (typeof id !== "string" || !id.trim() || id.length > 100)
+    return json({ error: "Choose a valid question." }, { status: 400 });
+  if (!["answer", "reject"].includes(intent))
+    return json({ error: "Invalid question action." }, { status: 400 });
   const question = await prisma.question.findFirst({
     where: { id, shop: session.shop },
   });
   if (!question) return json({ error: "Question not found." }, { status: 404 });
-  if (!["answer", "reject"].includes(intent))
-    return json({ error: "Invalid question action." }, { status: 400 });
   if (intent === "answer") {
     const answer = String(formData.get("answer") || "").trim();
     if (!answer || answer.length > 5000)

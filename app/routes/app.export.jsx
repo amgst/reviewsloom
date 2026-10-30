@@ -36,6 +36,11 @@ export const loader = async ({ request }) => {
             rating: true,
             body: true,
             imageUrl: true,
+            images: {
+              orderBy: { position: "asc" },
+              take: 1,
+              select: { url: true },
+            },
           },
         });
         if (!reviews.length) {
@@ -52,7 +57,7 @@ export const loader = async ({ request }) => {
                 r.reviewer,
                 r.rating,
                 r.body,
-                r.imageUrl,
+                r.imageUrl || r.images?.[0]?.url,
               ]
                 .map(toCsvValue)
                 .join(","),

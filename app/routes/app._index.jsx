@@ -25,6 +25,7 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { boundedFormData } from "../security.server";
 import { autoPublishEligibleReviews } from "../reviews.server";
 import {
   inboxQuery,
@@ -93,7 +94,7 @@ export const action = async ({ request }) => {
   const {
     session: { shop },
   } = await authenticate.admin(request);
-  const data = await request.formData();
+  const data = await boundedFormData(request);
   if (data.get("intent") === "onboarding") {
     const step = data.get("step");
     if (!["theme", "complete"].includes(step))

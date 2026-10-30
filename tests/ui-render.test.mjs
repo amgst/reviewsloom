@@ -123,7 +123,7 @@ for (const [name, fixture] of Object.entries(fixtures)) {
                     ? `import React from "react"; export const useLoaderData = () => globalThis.__reviewloomPreviewData; export const useFetcher = () => ({ state: "idle", Form: (props) => React.createElement("form", props), submit() {} }); export const useNavigation = () => ({state:"idle"}); export const useActionData = () => null; export const useSubmit = () => () => {}; export const useSearchParams = () => [new URLSearchParams(), () => {}]; export const Form = (props) => React.createElement("form", props);`
                     : id === "bridge"
                       ? "export const TitleBar = () => null;"
-                      : "export default {}; export const authenticate = {}; export const autoPublishEligibleReviews = async () => {};",
+                      : "export default {}; export const authenticate = {}; export const boundedFormData = async () => new FormData(); export const autoPublishEligibleReviews = async () => {};",
               }),
             );
           },

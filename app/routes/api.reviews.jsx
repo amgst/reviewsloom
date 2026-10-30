@@ -2,6 +2,7 @@ import { json } from "@remix-run/node";
 import prisma from "../db.server";
 import { autoPublishEligibleReviews } from "../reviews.server";
 import { createReviewDiscountCode } from "../discounts.server";
+import { assertReviewProduct } from "../review-product.server";
 import {
   reviewFormData,
   validateReviewPhotos,
@@ -14,6 +15,7 @@ import {
   visitorKey,
   textField,
   httpsUrl,
+  limitShopAction,
 } from "../security.server";
 
 const SORTS = {
@@ -139,7 +141,7 @@ export const action = async ({ request }) => {
     const url = new URL(request.url);
     const data = await reviewFormData(request);
     const productId = url.searchParams.get("product_id");
-    if (!productId || productId.length > 100)
+    if (!productId || !/^\d{1,30}$/.test(productId))
       return json({ error: "A product is required." }, { status: 400 });
     if (data.get("intent") === "vote") {
       await limitStorefront(request, shop, "vote", 60);
@@ -191,6 +193,7 @@ export const action = async ({ request }) => {
       return json({ error: "Choose a rating from 1 to 5." }, { status: 400 });
     const reviewer = textField(data, "reviewer", 100, true);
     const body = textField(data, "body", 5000, true);
+    await limitShopAction(shop, "reviews");
     const productName =
       textField(data, "product_name", 300) || "Product review";
     const photos = await validateReviewPhotos(data.getAll("photo"));
@@ -206,6 +209,10 @@ export const action = async ({ request }) => {
         { error: "Use up to six valid HTTPS photo URLs." },
         { status: 400 },
       );
+    const percent = Number(settings.reviewDiscountPercent);
+    if (photos.length || percent > 0)
+      await assertReviewProduct(shop, productId);
+    if (photos.length) await limitShopAction(shop, "photo-submissions", 30);
     const uploaded = await uploadReviewPhotos(shop, photos);
     let review;
     try {
@@ -246,7 +253,6 @@ export const action = async ({ request }) => {
     }
     let discountCode = null;
     let discountWarning = null;
-    const percent = Number(settings.reviewDiscountPercent);
     if (percent > 0) {
       try {
         discountCode = await createReviewDiscountCode(shop, percent);

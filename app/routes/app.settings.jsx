@@ -22,6 +22,7 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { boundedFormData } from "../security.server";
 import { settingsInput } from "../settings-validation";
 import { ThemeSetupGuide } from "../components/ThemeSetupGuide";
 
@@ -41,7 +42,7 @@ export const loader = async ({ request }) => {
 
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  const formData = await request.formData();
+  const formData = await boundedFormData(request);
 
   if (formData.get("intent") === "restart-onboarding") {
     await prisma.reviewSettings.update({
